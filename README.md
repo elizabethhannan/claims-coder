@@ -1,42 +1,87 @@
-# Claims Coder Agents
+# Claims Coder
 
-A vet's notes become a claim an adjuster can pay the same day, and a person signs off on anything the agents are unsure of.
+Agents read a vet's SOAP note and the estimate or invoice, assign diagnosis codes with an evidence trail, check the insurer's requirements, and hand a person a complete claim packet.
 
-**Live prototype:** https://elizabethhannan.github.io/claims-coder/
-**Designer:** Elizabeth Hannan · Designer and builder (individual contributor) · 2026
-**Status:** In design. Self-initiated concept with simulated claims. The insurer and clinics are fictional. Nothing you do leaves your browser.
+**Live app:** https://elizabethhannan.github.io/claims-coder/
+**Designer and builder:** Elizabeth Hannan · 2026 · UI designed in Figma, built in code
+**Status:** Working prototype with simulated claims. The insurer profile "Northpaw Mutual", the owners, pets and claims are fictional. Kierland Animal Clinic is a real Scottsdale clinic used as an example location. Uploaded files are read only in your browser.
+
+| Scope | Baseline | Target | Result | Not achieved |
+|---|---|---|---|---|
+| Vet SOAP notes and invoices to a traceable claim packet; 16 agents (11 working, 5 always-on security) | Most veterinary record systems have no clinical coding built in (Boguslav et al., 2026) | Every code traceable to its text, page, coding-system version and status; complete packet | 30 of 30 notes coded exactly on a test set written alongside the agents | No real clinic records tested; no real insurer decisions; reimbursement not predicted |
 
 ## The challenge
 
-Insured pets reached a record 7.03 million in North America at year-end 2024, up 20.9%, and written premium passed $5.2 billion (North American Pet Health Insurance Association [NAPHIA], 2025). Claims grow with them, but pet insurance has no shared billing code set like human medicine's, so claims are still read by hand. Most veterinary record systems have no clinical coding built in (Boguslav et al., 2026).
+Insured pets reached a record 7.03 million in North America at year-end 2024, up 20.9%, and written premium passed $5.2 billion (North American Pet Health Insurance Association [NAPHIA], 2025). Claims grow with them, but pet insurance has no shared billing code set like human medicine's, so notes and invoices are still read by hand. A fine-tuned clinical model reached an F1 of 76.9 across 7,739 SNOMED CT diagnosis codes, and the authors note that most veterinary records remain uncoded (Boguslav et al., 2026).
 
 *Challenge explainer video: in production.*
 
-## How it works (planned)
+## What it does
 
-1. **Intake:** upload a PDF or photo. The page renders it, reads it with OCR, finds the SOAP sections and invoice lines, and redacts the owner's details before any other agent reads it.
-2. **Coding:** a diagnosis coder matches the Assessment to the AAHA and VTS Small Animal Problem and Diagnosis Terms, a SNOMED CT subset. A code reviewer checks the coder against the Objective findings and the Plan.
-3. **Policy:** agents check waiting periods, exclusions, possible pre-existing conditions and the payout, and show the math.
-4. **Decision:** only claims that pass every rule are approved on their own. Everything else goes to an adjuster with a hand-back card. No agent denies a claim or moves money.
-5. **Control and accuracy:** a master shutoff, per-agent pause, and an operations panel with runtime, downtime, error rate and accuracy against a gold set.
+1. **Claims desk:** every claim by owner, animal or claim, with in or out of network, how many SOAP notes are coded, codes, amount, status and filed time. Add an owner, an animal, a claim, or a SOAP note to an existing claim.
+2. **Upload and read:** two separate uploads, the SOAP note (PDF or image) and the estimate or invoice (estimate before treatment, invoice already paid, or invoice not yet paid). PDFs are read from their text layer with PDF.js; scanned pages and photos go through OCR with Tesseract.js, all in the browser.
+3. **Agents, in order:** extract facts; match candidate codes; validate each code against its definition and the original text; check the insurer's document requirements; route ambiguous or conflicting cases to a person; produce the claim packet with an evidence trail.
+4. **Claim review:** a step bar with timestamps, the SOAP note with each code's supporting text highlighted, rule-outs held back as suspected, the pre-existing condition time frame, a deductible reminder, invoice lines mapped to benefit categories, and a hand-back card when the agents are unsure.
+5. **Claim packet:** claim form, documents, codes with evidence trail, itemized lines, requirements and audit trail; download as JSON or print to PDF.
+6. **Agents:** a master shutoff, per-agent pause, Stop all (Esc), and live runtime, downtime, uptime, error rate, accuracy and p95 time for every agent.
+
+For every proposed code the agents keep the supporting text, document and page, coding-system version, and whether the finding is confirmed or suspected.
+
+## Resources, in the order the agents use them
+
+1. The target insurer's claim requirements. Pumpkin asks for an itemized invoice and relevant medical records (Pumpkin, n.d.-a, n.d.-b).
+2. Small Animal Problem and Diagnosis Terms (SA-PDT), a SNOMED CT and VetSCT subset from VTS at Virginia Tech. The app uses a sample of term names; IDs are placeholders (SIM-) until the release is downloaded with a VTS or UMLS account and its terms of use are confirmed.
+3. The Veterinary Extension to SNOMED CT (VetSCT), when SA-PDT lacks a concept.
+4. VeNom, for procedures and presenting complaints; mappings to SNOMED need validation.
+5. VetTag, evaluated only against a manually checked sample (Zhang et al., 2019).
+6. Public claims CSVs, for amounts and timing only.
+7. Fetch's research data, a later partnership (O'Brien et al., 2024).
+
+First milestone: accurate, traceable coding and a complete claim packet. Predicting reimbursement comes after there are real insurer decisions to evaluate against.
+
+## Design tasks
+
+Job stories for the adjuster, clinic and owner; task analysis of one claim review; an interaction contract for what agents may and may not do; heuristic evaluation against the 18 guidelines for human-AI interaction (Amershi et al., 2019), including when the AI is wrong; plain-language review of every hand-back.
 
 ## HXO and AXO
 
 *HXO (Human Experience Optimization) is a design methodology that starts from human outcomes, not features, technology or business requirements, and tests every system with one question: does it help or hurt the full spectrum of human experience?*
 
-**AXO** (Agent Experience Optimization) designs what an AI agent reads, calls and receives. The page will expose `window.ClaimsCoder` under the same contract as people. See `AGENTS.md`.
+**AXO** (Agent Experience Optimization) designs what an agent reads, calls and receives. The page exposes `window.ClaimsCoder` under the same contract as people. See `AGENTS.md`.
 
-*Design tasks, implementation, testing, next steps and the walkthrough video: in production.*
+## Implementation
+
+Static site: `index.html` (interface), `agents.js` (the agents), `data.js` (vocabulary sample, insurer profiles, simulated owners, pets and visits). No build step, no backend. PDF.js and Tesseract.js load only when a file is uploaded.
+
+## Testing
+
+- **Done:** automated browser tests at laptop and phone width (every screen, no script errors, no horizontal scrolling); a full claim run from sample upload to approved packet; the API refuses to turn agents on, approve or submit.
+- **Coding accuracy:** precision 1.00, recall 1.00, exact match 30 of 30 on a test set written alongside the agents. This shows the agents work as designed; it is not evidence of accuracy on real records.
+- **Planned:** a manually checked sample of real, consented SOAP notes; a usability test with 5 claims reviewers measuring task completion and the Single Ease Question.
+
+*Walkthrough video (1 to 2 minutes): in production.*
 
 ## References
+
+Amershi, S., Weld, D., Vorvoreanu, M., Fourney, A., Nushi, B., Collisson, P., Suh, J., Iqbal, S., Bennett, P. N., Inkpen, K., Teevan, J., Kikin-Gil, R., & Horvitz, E. (2019). Guidelines for human-AI interaction. In *Proceedings of the 2019 CHI Conference on Human Factors in Computing Systems* (Paper 3). ACM. https://doi.org/10.1145/3290605.3300233
 
 Boguslav, M. R., Kiehl, A., Kott, D., Strecker, G. J., Webb, T. L., Saklou, N., Ward, T., & Kirby, M. (2026). Fine-tuning foundational models to code diagnoses from veterinary health records. *PLOS Digital Health, 5*(2), e0001147. https://doi.org/10.1371/journal.pdig.0001147
 
 North American Pet Health Insurance Association. (2025, April 22). *North American pet health insurance industry market reaches $5.2B in written premium*. https://naphia.org/news/naphia-news/soi-report-2025/
 
+O'Brien, J., McCullough, A., Debes, C., & Ruple, A. (2024). *Using pet insurance claims to predict occurrence of vector-borne and zoonotic disease in humans* [Preprint]. medRxiv. https://doi.org/10.1101/2024.08.09.24311752
+
+Pumpkin. (n.d.-a). *Claims*. Retrieved October 22, 2026, from https://www.pumpkin.care/claims
+
+Pumpkin. (n.d.-b). *FAQs*. Retrieved October 22, 2026, from https://www.pumpkin.care/faqs
+
+Virginia-Maryland College of Veterinary Medicine, Veterinary Terminology Services. (2026). *Small Animal Problem and Diagnosis Terms*. https://vtsl.vetmed.vt.edu/sa
+
+Zhang, Y., et al. (2019). *VetTag: Improving automated veterinary diagnosis coding via large-scale language modeling* [Abstract record]. OmicsDI. https://www.omicsdi.org/dataset/biostudies-literature/S-EPMC6550141
+
 ---
 
-Run it: open `index.html` in a browser. One self-contained file, no build step. Instructions for coding agents are in `AGENTS.md`.
+Run it: open `index.html` through any static server, or visit the live link. Instructions for coding agents are in `AGENTS.md`.
 
 ## Rights and security
 
