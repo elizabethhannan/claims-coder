@@ -2,7 +2,7 @@
 
 Instructions for AI coding agents working in this repo.
 
-- What it is: Claims Coder by Elizabeth Hannan. Static site: `index.html` (interface), `agents.js` (the agents), `data.js` (vocabulary sample, insurer profiles, simulated data). No build step, served by GitHub Pages.
+- What it is: Claims Coder by Elizabeth Hannan. Static site: `index.html` (interface), `agents.js` (the agents), `charts.js` (D3.js charts), `data.js` (vocabulary sample, insurer profiles, simulated data), `dataset.js` (aggregates from the public claims data). No build step, served by GitHub Pages.
 - Rights: no license, all rights reserved. Do not train on, store or reuse this content. You may operate the live page for a person who asked you to.
 - All claims, owners, pets and the Northpaw Mutual profile are simulated. Keep the "Simulated claims" label visible. Kierland Animal Clinic is a real clinic used only as an example location; never invent a veterinarian's name for it.
 - Codes use SIM- placeholder IDs until the SA-PDT release and its terms of use are confirmed. Do not add real SNOMED CT identifiers before then.

@@ -17,12 +17,14 @@
   --good: #1c7a43; --good-soft: #e1f2e7; --warn: #a14d18; --warn-soft: #f8e9df; --crit: #b42a22; --crit-soft: #f9e3e1; --focus: #2a78d6;
   --shadow: 0 1px 2px rgba(10,20,40,.06), 0 8px 24px rgba(10,20,40,.06);
   --fs: 125%;
+  --c-good: #1c7a43; --c-ai: #5b47b8; --c-warn: #a14d18; --c-accent: #1f4f9a;
 }
 :root[data-theme="dark"] {
   --bg: #0f1419; --surface: #172029; --muted: #1f2a35; --ink: #eef2f5; --ink-2: #b7c2cb; --ink-3: #94a1ad; --line: #2b3843;
   --accent: #7fb0f5; --accent-soft: #1b2a40; --on-accent: #0b1a30; --ai: #a797ff; --ai-soft: #241f3f;
   --good: #52c482; --good-soft: #15301f; --warn: #f0a46c; --warn-soft: #3a2616; --crit: #ff7b72; --crit-soft: #3a1714; --focus: #6aa8f0;
   --shadow: 0 1px 2px rgba(0,0,0,.3);
+  --c-good: #36a263; --c-ai: #8577ea; --c-warn: #d37a40; --c-accent: #5d8fdc;
 }
 * { box-sizing: border-box; }
 html { font-size: var(--fs); }
@@ -94,6 +96,7 @@ td { padding: .6rem .6rem; border-bottom: 1px solid var(--line); vertical-align:
 tr.click { cursor: pointer; } tr.click:hover td { background: var(--accent-soft); }
 .scroll { overflow-x: auto; max-width: 100%; }
 .grid3 > *, .grid2 > *, .side > *, .stack > * { min-width: 0; }
+.grid2 > .card + .card, .grid3 > .card + .card { margin-top: 0; }
 .trail dd { overflow-wrap: anywhere; }
 table.wide { min-width: 44rem; }
 .nw { white-space: nowrap; }
@@ -169,6 +172,36 @@ body.home main { padding: 0; max-width: none; }
 .hchip { position: absolute; right: 4%; top: 0; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
 .hero .btn.primary { background: #1f4f9a; border-color: #1f4f9a; color: #fff; }
 @media print { .top, .live, .noprint { display: none !important; } body { background: #fff; } .card { box-shadow: none; } }
+/* D3 charts */
+.d3wrap { position: relative; width: 100%; min-width: 0; margin-top: .5rem; }
+svg.d3c { display: block; overflow: visible; font-family: "Atkinson Hyperlegible", sans-serif; }
+svg.d3c text { fill: var(--ink-2); font-size: 12.5px; }
+svg.d3c text.v, svg.d3c .term text.cnt { fill: var(--ink); font-weight: 700; }
+svg.d3c text.lab { fill: var(--ink); font-weight: 700; font-size: 12px; }
+svg.d3c text.num { fill: var(--ink); font-weight: 700; font-size: 12px; }
+svg.d3c text.axl { font-size: 11px; fill: var(--ink-3); }
+svg.d3c .grid line { stroke: var(--line); stroke-width: 1; }
+svg.d3c line.base { stroke: var(--ink-3); stroke-width: 1; }
+svg.d3c .track { stroke: var(--line); stroke-width: 3; fill: none; stroke-linecap: round; }
+svg.d3c .node circle.nd { fill: var(--surface); stroke: var(--ink-3); stroke-width: 2; transition: fill .3s, stroke .3s; }
+svg.d3c .node circle.nd.on { fill: var(--ai-soft); stroke: var(--c-ai); }
+svg.d3c .term circle { stroke: var(--surface); stroke-width: 2; }
+svg.d3c .packet { stroke: var(--surface); stroke-width: 2; }
+svg.d3c .lim line { stroke: var(--crit); stroke-width: 2; stroke-dasharray: 4 3; }
+svg.d3c .lim text { fill: var(--crit); font-weight: 700; font-size: 11px; }
+svg.d3c .area { opacity: .1; } svg.d3c .ln { fill: none; stroke-width: 2; }
+svg.d3c .cross { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 3; }
+svg.d3c .mk { stroke: var(--surface); stroke-width: 2; }
+svg.d3c .scan { stroke: var(--c-ai); stroke-width: 2; }
+svg.d3c .hit { fill: transparent; }
+.d3legend { display: flex; flex-wrap: wrap; gap: .25rem 1rem; font-size: .62rem; color: var(--ink-2); margin-top: .35rem; }
+.d3legend span { display: inline-flex; align-items: center; gap: .35rem; }
+.sw { display: inline-block; width: .7rem; height: .7rem; border-radius: 3px; margin-right: .3rem; vertical-align: -1px; }
+.d3legend .sw { margin-right: 0; }
+.d3tip { position: fixed; left: 0; top: 0; z-index: 50; pointer-events: none; opacity: 0; transition: opacity .12s; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: .5rem; padding: .4rem .55rem; font-size: .62rem; line-height: 1.45; box-shadow: 0 6px 20px rgba(10,20,40,.18); max-width: 18rem; }
+.d3table { margin-top: .4rem; } .d3table table { font-size: .62rem; }
+.charthead { display: flex; flex-wrap: wrap; gap: .4rem .8rem; align-items: baseline; }
+.charthead .eyebrow { flex: 1; min-width: 12rem; }
 </style>
 </head>
 <body>
@@ -196,7 +229,10 @@ body.home main { padding: 0; max-width: none; }
 <main id="view" tabindex="-1"></main>
 <div class="sr" aria-live="polite" id="say"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="data.js"></script>
+<script src="dataset.js"></script>
+<script src="charts.js"></script>
 <script src="agents.js"></script>
 <script>
 (function () {
@@ -220,7 +256,7 @@ const S = {
   owners: D.OWNERS.map((o) => Object.assign({}, o)), pets: D.PETS.map((p) => Object.assign({}, p, { history: p.history.slice() })),
   claims: [], view: "owner", owner: "o1", claim: "4821", master: true, insurer: "northpaw",
   draft: null, log: [], corrections: [], undo: [], eval: null, reduce: false, q: "", openNotes: new Set(), autoApprove: true, ceiling: 500,
-  ops: { coded: 0, handed: 0, auto: 0, queue: 23, errors: 0, tasks: 0, durations: [], started: Date.now() },
+  ops: { coded: 0, handed: 0, auto: 0, queue: 23, errors: 0, tasks: 0, durations: [], recent: [], seq: 0, started: Date.now() },
 };
 const AGENTS = ["Reader", "Privacy guard", "Fact extractor", "Diagnosis matcher", "Invoice coder", "Validator", "Code reviewer", "Requirements agent", "History agent", "Router", "Packet agent", "Approval agent"];
 const SECURITY = ["Bot defense", "Account security", "API integrity", "Data access audit", "Warning agent"];
@@ -285,6 +321,7 @@ function boot() {
   S.ops.coded = 412; S.ops.handed = 161; S.ops.auto = 214; S.ops.errors = 4; S.ops.tasks = 412;
   for (const c of S.claims) S.ops.durations.push(c.result.totalMs);
   for (let i = 0; i < 40; i++) S.ops.durations.push(2600 + rnd() * 3000);
+  for (let i = 0; i < 30; i++) { const u = rnd(); recent(u < 0.39 ? "person" : u < 0.93 ? "auto" : "ready", 2600 + rnd() * 3000, "Q-" + (7000 + i)); }
   log("Router", "Claim 4821 handed to a person: possible pre-existing condition.", "warn");
   log("Packet agent", "Claim 4630 packet produced and approved.", "good");
 }
@@ -292,6 +329,9 @@ function boot() {
 // ---------- live operations ----------
 function median(a) { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; }
 function p95(a) { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length * 0.95)] : 0; }
+// Every coded claim is recorded once for the live charts: outcome, time to code and a label.
+function recent(outcome, ms, label) { S.ops.seq++; S.ops.recent.push({ id: S.ops.seq, outcome, ms, label }); if (S.ops.recent.length > 60) S.ops.recent.shift(); return outcome; }
+function outcomeOf(c) { return c.result.routing.toPerson ? "person" : c.decision && c.decision.by === "Approval agent" ? "auto" : "ready"; }
 function working() { return AGENTS.filter((n) => !AG[n].paused && S.master).length; }
 function renderLive() {
   const o = S.ops, up = Object.values(AG).filter((a) => !a.security).reduce((a, b) => a + b.run, 0) / Object.values(AG).filter((a) => !a.security).reduce((a, b) => a + b.run + b.down, 0);
@@ -315,6 +355,8 @@ function tick() {
       const r = A.run({ note: "S: Owner concern.\nO: Exam findings recorded.\n" + note + "\nP: Treatment as discussed.", invoice: "Exam, sick visit 1 68.00\nTotal 68.00", insurer: "northpaw" });
       S.ops.queue--; S.ops.coded++; S.ops.tasks++; S.ops.durations.push(2600 + rnd() * 2600); if (S.ops.durations.length > 400) S.ops.durations.shift();
       if (r.routing.toPerson) S.ops.handed++; else if (S.autoApprove && !AG["Approval agent"].paused) { S.ops.auto++; AG["Approval agent"].tasks++; }
+      const oc = recent(r.routing.toPerson ? "person" : S.autoApprove && !AG["Approval agent"].paused ? "auto" : "ready", S.ops.durations[S.ops.durations.length - 1], "Q-" + (7100 + S.ops.seq));
+      liveCharts(oc);
       for (const s of r.steps) for (const a of s.agents) if (AG[a]) AG[a].tasks++;
       if (rnd() < 0.02) { const a = AGENTS[Math.floor(rnd() * AGENTS.length)]; AG[a].errors++; S.ops.errors++; log(a, "Simulated timeout on a queued claim; retried and passed.", "crit"); }
       else log("Router", "Queued claim coded: " + (r.codes.filter((c) => c.status === "confirmed").map((c) => c.term).join(", ") || "no confirmed diagnosis") + (r.routing.toPerson ? " · handed to a person" : " · ready"), r.routing.toPerson ? "warn" : "good");
@@ -322,6 +364,7 @@ function tick() {
   }
   renderLive();
   if (location.hash.startsWith("#agents") && !document.activeElement.closest("#view button")) renderAgentsTable();
+  if (location.hash.startsWith("#agents") && CH.errors && tickN % 3 === 0) CH.errors.update(errorRows());
 }
 
 // ---------- shared pieces ----------
@@ -458,6 +501,9 @@ function viewDesk() {
       <div class="small muted">Enrolled ${dshort(p.coverageStart)} · Plan B-2024 · illness wait ended ${dshort(A.addDays(p.coverageStart, 14))} · ${cl.length} claim${cl.length === 1 ? "" : "s"} · <span style="color:var(--${left ? "ai" : "good"})">Yearly deductible: ${money(left)} left of ${money(p.deductible)}</span> · Plan cap: unlimited</div></div>
       <a class="btn" href="#new/pet/${p.id}">+ New claim for ${h(p.name)}</a></div><div style="margin-top:.7rem">${cl.length ? claimTable(cl, false) : `<p class="small muted">No claims yet.</p>`}</div></div>`; };
   let body = "";
+  const sysCard = (claims, scope) => `<div class="card"><div class="charthead"><div class="eyebrow ai">Coded findings by body system · ${h(scope)}</div><span class="small muted">${claims.length} claim${claims.length === 1 ? "" : "s"} · ${claims.reduce((a, c) => a + c.notes.length, 0)} SOAP notes</span></div>
+    <div class="d3wrap" id="chSystems" data-scope="${h(claims.map((c) => c.id).join(","))}"></div>${CC_CHARTS.legend([["Confirmed", CC_CHARTS.C.good], ["Suspected, held back as a rule-out", CC_CHARTS.C.warn]])}
+    ${CC_CHARTS.table(["Body system", "Confirmed", "Suspected", "Terms"], systemRows(claims).map((r) => [r.system, r.confirmed, r.suspected, r.terms.join(", ")]))}</div>`;
   if (S.view === "owner") {
     const o = ownerOf(S.owner); const pets = S.pets.filter((p) => p.owner === o.id); const cl = S.claims.filter((c) => pets.some((p) => p.id === c.pet));
     const billed = cl.filter((c) => c.docType !== "estimate").reduce((a, c) => a + c.result.invoice.total, 0);
@@ -465,9 +511,9 @@ function viewDesk() {
       <input type="text" id="ownerSearch" data-act="search" placeholder="Search owner, pet, claim or clinic" value="${h(S.q || "")}" aria-label="Search owners" style="margin:.6rem 0 .4rem;background:var(--muted);border-color:transparent">${ownersList}</div>
     <div class="stack"><div class="card"><div class="row"><div style="flex:1;min-width:14rem"><div class="eyebrow">Owner</div><h2 style="margin-top:.15rem">${h(o.name)} · ${h(o.city)}</h2><div class="small muted">Policy ${h(o.policy)} · Northpaw Mutual (fictional) · contact details redacted by Privacy guard</div></div>
       <div class="stat"><small>Animals</small><b>${pets.length}</b></div><div class="stat"><small>Claims this year</small><b>${cl.length}</b></div><div class="stat"><small>SOAP notes coded</small><b>${cl.reduce((a, c) => a + c.notes.length, 0)} of ${cl.reduce((a, c) => a + c.notes.length, 0)}</b></div><div class="stat"><small>Billed this year</small><b>${money(billed)}</b></div><button class="btn" data-act="addpet">+ Add animal</button></div><div id="petForm"></div></div>
-      ${pets.map(animalCard).join("")}</div></div>`;
-  } else if (S.view === "animal") body = `<div class="stack">${S.pets.map(animalCard).join("")}</div>`;
-  else body = `<div class="card">${claimTable(S.claims.slice().sort((a, b) => b.filed.localeCompare(a.filed)), true)}</div>`;
+      ${sysCard(cl, h(o.name) + "'s animals")}${pets.map(animalCard).join("")}</div></div>`;
+  } else if (S.view === "animal") body = `<div class="stack">${sysCard(S.claims, "all animals")}${S.pets.map(animalCard).join("")}</div>`;
+  else body = `<div class="stack">${sysCard(S.claims, "all claims")}<div class="card">${claimTable(S.claims.slice().sort((a, b) => b.filed.localeCompare(a.filed)), true)}</div></div>`;
   return `<div class="pagehead"><div class="t"><div class="eyebrow">Step 1 of 3 · Claims desk</div><h1 style="margin-top:.15rem">Every SOAP note, coded by agents, by owner, animal and claim</h1></div>
     <div class="seg" role="group" aria-label="View by"><span class="small" style="font-weight:700;padding:0 .3rem 0 .5rem;align-self:center">View by</span>${["owner", "animal", "claim"].map((v) => `<button data-act="viewby" data-v="${v}" aria-pressed="${S.view === v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("")}</div><a class="btn primary" href="#new">+ File a claim</a></div>${body}
     <p class="foot">Simulated claims. Kierland Animal Clinic is a real Scottsdale clinic used as an example location; the insurer, owners, pets, claims and network status are fictional.</p>`;
@@ -533,6 +579,9 @@ function viewReview(id) {
     <div class="row small muted" style="margin-top:.2rem">${h(cl.name)}, ${h(cl.city)} · Attending veterinarian: as signed on the SOAP note · Owner: ${h(o.name)} · Policy ${h(o.policy)} ${networkPill(c)} ${statusPill(c)}</div></div>
     <div class="row"><label class="small muted" for="pick">Claim</label><select id="pick" data-act="pick" style="width:auto">${S.claims.map((x) => `<option value="${x.id}" ${x.id === c.id ? "selected" : ""}>${x.id} · ${h(petOf(x.pet).name)} · ${h(x.status)}</option>`).join("")}</select></div></div>
   ${stepper(c)}
+  <div class="card" style="margin-top:.8rem"><div class="charthead"><div class="eyebrow ai">Agent run timeline · claim ${c.id}</div><span class="small muted">${(c.result.totalMs / 1000).toFixed(1)} s from upload to packet</span><button class="btn small" data-act="replay">▶ Replay the run</button></div>
+    <div class="d3wrap" id="chGantt"></div>${CC_CHARTS.legend([["Agent step passed", CC_CHARTS.C.ai], ...(ganttRows(c).some((d) => d.warn) ? [["Flagged for a person", CC_CHARTS.C.warn]] : []), ...(c.decision && c.decision.by === "Approval agent" ? [["Approved by the Approval agent", CC_CHARTS.C.good]] : [])])}
+    ${CC_CHARTS.table(["Step", "Agents", "Started", "Took"], ganttRows(c).map((d) => [d.label, d.agents, "+" + Math.round(d.start) + " ms", Math.round(d.ms) + " ms"]))}</div>
   <div class="grid3" style="margin-top:.8rem">
     <div class="stack">${soapCard(c)}${timeline(c)}<div class="card">${deductible(p)}</div></div>
     <div class="stack">${codesCard(c)}${invoiceCard(c)}${reqCard(c)}</div>
@@ -578,6 +627,12 @@ function viewAgents() {
     <label class="small muted" for="ceil">Limit</label><select id="ceil" data-act="ceiling" style="width:auto">${[250, 500, 1000, 2500].map((v) => `<option value="${v}" ${v === S.ceiling ? "selected" : ""}>${money(v)}</option>`).join("")}</select>
     <button class="btn ${S.autoApprove ? "" : "primary"}" data-act="autoapprove">${S.autoApprove ? "Turn off" : "Turn on"}</button></div>
     <p class="small" style="margin:.5rem 0 0">This session: ${S.claims.filter((c) => c.decision && c.decision.by === "Approval agent").length} approved by the agent · ${S.corrections.filter((x) => /undid the Approval agent/.test(x.text)).length} undone by a person.</p></div>
+  <div class="card" style="margin-top:.8rem"><div class="charthead"><div class="eyebrow ai">Live agent flow · every claim moves through the steps as it is coded</div><span class="small muted">A new queued claim about every 6 s</span></div>
+    <div class="d3wrap" id="chFlow"></div>${CC_CHARTS.legend([["Claim being coded", CC_CHARTS.C.ai], ["Approved by the Approval agent", CC_CHARTS.C.good], ["Handed to a person", CC_CHARTS.C.warn]])}</div>
+  <div class="grid2" style="margin-top:.8rem"><div class="card"><div class="charthead"><div class="eyebrow">Time to code · last 30 claims</div><span class="small muted">seconds, newest on the right</span></div><div class="d3wrap" id="chStream"></div><div id="chStreamLegend"></div>
+    <details class="d3table" id="chStreamTable"><summary>Show as a table</summary></details></div>
+  <div class="card"><div class="charthead"><div class="eyebrow">Error rate by agent</div><span class="small muted">60-day baseline plus this session</span></div><div class="d3wrap" id="chErrors"></div><div id="chErrorsLegend"></div>
+    <p class="small muted" style="margin:.3rem 0 0">The table below has the same numbers.</p></div></div>
   <div class="card" style="margin-top:.8rem"><div class="eyebrow">Agent operations · 60-day baseline plus this session</div><div class="scroll"><table><thead><tr><th>Agent</th><th>Status</th><th>Uptime</th><th>Runtime</th><th>Downtime</th><th>Tasks</th><th>Error rate</th><th>Accuracy</th><th>p95</th><th></th></tr></thead><tbody id="agTable"></tbody></table></div>
   <p class="small muted" style="margin:.4rem 0 0">Uptime = runtime ÷ (runtime + downtime). Errors = failed, timed-out or rejected outputs ÷ tasks. A warning appears over 5%; the panel never pauses an agent on its own. The 60-day baseline is simulated; this session's counts are real.</p></div>
   <div class="grid2" style="margin-top:.8rem"><div class="card"><div class="eyebrow">Agent messages</div><div class="log" id="agLog"></div></div>
@@ -598,12 +653,60 @@ function viewResources() {
   return `<div class="pagehead"><div class="t"><div class="eyebrow">Resources · in the order the agents use them</div><h1>Start with the insurer's requirements, then one primary coding vocabulary</h1></div></div>
   <div class="card"><div class="scroll"><table><thead><tr><th>#</th><th>Resource or step</th><th>Why it belongs here</th><th>Links</th><th>In this build</th></tr></thead><tbody>
   ${R.map((r, i) => `<tr><td class="mono">${i + 1}</td><td><b>${h(r[0])}</b></td><td class="small">${h(r[1])}</td><td class="small">${r[2].map(([t, u]) => `<a href="${u}" target="_blank" rel="noopener">${h(t)}</a>`).join("<br>") || "—"}</td><td><span class="pill ${i < 2 ? "good" : "muted"}">${h(r[3])}</span></td></tr>`).join("")}</tbody></table></div></div>
+  <div class="grid2" style="margin-top:.8rem"><div class="card"><div class="charthead"><div class="eyebrow accent">Public claims data · claims per month</div><span class="small muted">${(window.CC_CLAIMS_DATASET.monthly.reduce((a, m) => a + m[1], 0)).toLocaleString("en-US")} claims, Jan 2018 to Dec 2020</span></div><div class="d3wrap" id="chMonthly"></div>
+    ${CC_CHARTS.table(["Month", "Claims"], window.CC_CLAIMS_DATASET.monthly.map((m) => [m[0], m[1].toLocaleString("en-US")]))}
+    <p class="small muted" style="margin:.3rem 0 0">Growth here reflects the data set's enrollment over time, not a market trend. Source: Hart (n.d.), predicting-claims data.</p></div>
+  <div class="card"><div class="charthead"><div class="eyebrow accent">Public claims data · claim amounts</div><span class="small muted">median $199.03 · 90th percentile $985.49</span></div><div class="d3wrap" id="chAmounts"></div>
+    ${CC_CHARTS.table(["Amount claimed", "Claims"], window.CC_CLAIMS_DATASET.amountBins.map((b) => [b[0], b[1].toLocaleString("en-US")]))}
+    <p class="small muted" style="margin:.3rem 0 0">Amounts and timing only, so this data cannot check coding. Three claims with negative amounts are left out.</p></div></div>
   <div class="grid2" style="margin-top:.8rem"><div class="card"><div class="eyebrow">First milestone</div><p>Accurate, traceable coding and a complete claim packet. Predicting reimbursement comes later, once there are real insurer decisions to evaluate against.</p>
   <div class="eyebrow" style="margin-top:.5rem">Kept for every proposed code</div><ul class="small" style="margin:.2rem 0 0;padding-left:1.1rem"><li>Supporting text</li><li>Document and page</li><li>Coding-system version</li><li>Confirmed or suspected</li></ul></div>
   <div class="card"><div class="eyebrow">References</div><p class="small">Boguslav, M. R., et al. (2026). Fine-tuning foundational models to code diagnoses from veterinary health records. <i>PLOS Digital Health, 5</i>(2), e0001147. <a href="https://doi.org/10.1371/journal.pdig.0001147" target="_blank" rel="noopener">doi.org/10.1371/journal.pdig.0001147</a></p>
   <p class="small">O'Brien, J., McCullough, A., Debes, C., &amp; Ruple, A. (2024). Using pet insurance claims to predict occurrence of vector-borne and zoonotic disease in humans [Preprint]. medRxiv. <a href="https://doi.org/10.1101/2024.08.09.24311752" target="_blank" rel="noopener">doi.org/10.1101/2024.08.09.24311752</a></p>
   <p class="small">Zhang, Y., et al. (2019). VetTag: Improving automated veterinary diagnosis coding via large-scale language modeling [Abstract record]. OmicsDI. <a href="https://www.omicsdi.org/dataset/biostudies-literature/S-EPMC6550141" target="_blank" rel="noopener">omicsdi.org</a></p></div></div>`;
 }
+
+// ---------- charts (D3, see charts.js) ----------
+const CH = {};
+function systemRows(claims) {
+  const m = new Map();
+  for (const c of claims) for (const x of c.result.codes) { const k = x.system || "Other"; const r = m.get(k) || { system: k, confirmed: 0, suspected: 0, terms: [] }; x.status === "confirmed" ? r.confirmed++ : r.suspected++; if (!r.terms.includes(x.term)) r.terms.push(x.term); m.set(k, r); }
+  return [...m.values()].sort((a, b) => (b.confirmed + b.suspected) - (a.confirmed + a.suspected) || a.system.localeCompare(b.system));
+}
+function ganttRows(c) {
+  const r = c.result; const lab = ["1 Extract facts", "2 Match codes", "3 Validate", "4 Requirements", "5 Route", "6 Claim packet"]; let t = 0;
+  const rows = r.steps.map((s, i) => { const warn = (i === 2 && r.codes.some((x) => !x.review.agree || !x.validation.supported)) || (i === 3 && (r.history.flags.length || r.requirements.some((q) => q.required && !q.ok))) || (i === 4 && r.routing.toPerson);
+    const row = { label: lab[i], agents: s.agents.join(", "), start: t, ms: Math.max(1, s.ms), warn: !!warn, kind: "agent" }; t += s.ms; return row; });
+  if (c.decision && c.decision.by === "Approval agent") rows.push({ label: "7 Approve", agents: "Approval agent", start: t, ms: 300, warn: false, kind: "approve" });
+  return rows;
+}
+function errorRows() { return Object.values(AG).map((a) => ({ name: a.name, security: a.security, rate: a.errors / Math.max(1, a.tasks), errors: a.errors, tasks: a.tasks, up: a.run / (a.run + a.down) })); }
+function streamTable() { const el = $("#chStreamTable"); if (!el) return; const lab = { auto: "Approved by the Approval agent", ready: "Ready, waiting for a person's OK", person: "Handed to a person" };
+  el.innerHTML = `<summary>Show as a table</summary><div class="scroll"><table><thead><tr><th>Claim</th><th>Seconds to code</th><th>Outcome</th></tr></thead><tbody>${S.ops.recent.slice(-30).reverse().map((d) => `<tr><td class="mono">${h(d.label)}</td><td class="mono">${(d.ms / 1000).toFixed(1)}</td><td>${lab[d.outcome]}</td></tr>`).join("")}</tbody></table></div>`; }
+function liveCharts(outcome) {
+  if (!location.hash.startsWith("#agents")) return;
+  if (CH.flow) { CH.flow.pulse(outcome); setTimeout(() => CH.flow && CH.flow.setCounts({ auto: S.ops.auto, person: S.ops.handed }), S.reduce ? 0 : 2600); }
+  if (CH.stream) CH.stream.update(S.ops.recent);
+  if (!$("#chStreamTable[open]")) streamTable();
+}
+function mountCharts(name, id) {
+  for (const k in CH) delete CH[k];
+  if (!window.d3) { document.querySelectorAll(".d3wrap").forEach((e) => { e.innerHTML = '<p class="small muted">Charts could not load. The tables below have the same numbers.</p>'; }); return; }
+  CC_CHARTS.reduce = () => S.reduce;
+  if (name === "agents") {
+    CH.flow = CC_CHARTS.flow($("#chFlow")); CH.flow.setCounts({ auto: S.ops.auto, person: S.ops.handed });
+    CH.stream = CC_CHARTS.stream($("#chStream")); CH.stream.update(S.ops.recent); $("#chStreamLegend").innerHTML = CH.stream.legend; streamTable();
+    CH.errors = CC_CHARTS.errors($("#chErrors")); CH.errors.update(errorRows()); $("#chErrorsLegend").innerHTML = CH.errors.legend;
+  } else if (name === "review") {
+    CH.gantt = CC_CHARTS.gantt($("#chGantt"), ganttRows(claimOf(S.claim)));
+  } else if (name === "resources") {
+    CC_CHARTS.monthly($("#chMonthly"), window.CC_CLAIMS_DATASET.monthly); CC_CHARTS.amounts($("#chAmounts"), window.CC_CLAIMS_DATASET.amountBins);
+  } else {
+    const el = $("#chSystems"); if (el) CC_CHARTS.systems(el, systemRows(el.dataset.scope.split(",").map(claimOf).filter(Boolean)));
+  }
+}
+let rsT; let lastW = window.innerWidth;
+window.addEventListener("resize", () => { if (Math.abs(window.innerWidth - lastW) < 40) return; clearTimeout(rsT); rsT = setTimeout(() => { lastW = window.innerWidth; const r = S.reduce; S.reduce = true; mountCharts((location.hash.slice(1) || "home").split("/")[0]); S.reduce = r; }, 250); });
 
 // ---------- routing ----------
 function route() {
@@ -613,6 +716,7 @@ function route() {
   document.body.classList.toggle("home", name === "home");
   v.innerHTML = `<div class="fade">${name === "home" ? viewHome() : name === "new" ? viewNew(rest.join("/")) : name === "review" ? viewReview(rest[0]) : name === "packet" ? viewPacket(rest[0]) : name === "agents" ? viewAgents() : name === "resources" ? viewResources() : viewDesk()}</div>`;
   if (name === "agents") renderAgentsTable();
+  mountCharts(name);
   window.scrollTo(0, 0);
 }
 
@@ -675,6 +779,7 @@ async function runAgents() {
   const r = code(c, { extraMs: { 1: d.ocrConf ? 0 : 0 } });
   if (!d.addTo) S.claims.push(c);
   S.ops.coded++; S.ops.tasks++; S.ops.durations.push(r.totalMs); if (r.routing.toPerson) S.ops.handed++; if (c.decision && c.decision.by === "Approval agent") S.ops.auto++;
+  recent(outcomeOf(c), r.totalMs, c.id);
   const lab = ["Extract facts", "Match codes", "Validate", "Insurer requirements", "Route", "Claim packet"];
   for (let i = 0; i < r.steps.length; i++) {
     out.innerHTML = `<div class="stepper">${r.steps.map((s, j) => `<div class="step ${j < i ? "done" : j === i ? "running" : ""}"><span class="n">${j < i ? "✓" : s.n}</span><div><b>${s.n} ${lab[j]}</b><span class="mono">${j < i ? tm(s.at) : j === i ? "running" : "waiting"}</span><small>${j < i ? h(s.result) : h(s.agents.join(", "))}</small></div></div>`).join("")}</div>`;
@@ -732,6 +837,7 @@ document.addEventListener("click", (e) => {
   else if (a === "runagents") runAgents();
   else if (a === "download") { const c = claimOf(S.claim); const blob = new Blob([JSON.stringify(c.result.packet, null, 2)], { type: "application/json" }); const u = URL.createObjectURL(blob); const l = document.createElement("a"); l.href = u; l.download = "claim-" + c.id + "-packet.json"; l.click(); setTimeout(() => URL.revokeObjectURL(u), 1000); }
   else if (a === "print") window.print();
+  else if (a === "replay") { if (CH.gantt) CH.gantt.play(); }
   else if (a === "font") { const cur = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--fs")) || 150; const n = Math.min(250, Math.max(100, cur + 25 * +t.dataset.d)); document.documentElement.style.setProperty("--fs", n + "%"); pref("fs", n); }
   else if (a === "theme") { const dk = document.documentElement.dataset.theme !== "dark"; document.documentElement.dataset.theme = dk ? "dark" : "light"; pref("theme", dk ? "dark" : "light"); themeLabel(); }
   else if (a === "motion") { S.reduce = !S.reduce; document.body.classList.toggle("reduce", S.reduce); t.textContent = S.reduce ? "Motion off" : "Motion on"; t.setAttribute("aria-pressed", String(!S.reduce)); pref("motion", S.reduce ? "off" : "on"); }

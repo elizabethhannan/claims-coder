@@ -26,6 +26,7 @@ Insured pets reached a record 7.03 million in North America at year-end 2024, up
 6. **Approval agent:** approves a claim packet as ready to submit only when all six agent steps passed, every code is confirmed, supported and agreed, every required document is present, there is no pre-existing or waiting-period flag, and the total is at or under a limit a person sets ($500 by default). It never denies, never pays and never acts on an estimate. A person can turn it off, change the limit, or undo any approval; each undo is logged as a labeled example.
 7. **Agents:** a master shutoff, per-agent pause, Stop all (Esc), and live runtime, downtime, uptime, error rate, accuracy and p95 time for every agent.
 8. **Overview:** a landing page built from the Figma cover. Light and dark mode button in the top bar.
+9. **Data visualizations in motion (D3.js):** a live agent flow where each queued claim travels through the seven steps and lands at "Approved" or "To a person"; streaming bars of time to code for the last 30 claims, colored by outcome; error rate by agent against the 5% warning line; a replayable timeline of how long each agent step took on a claim; coded findings by body system, confirmed and suspected; and, from the public claims data, claims per month and the spread of claim amounts. Every chart has hover details and a table view, and motion stops when Motion is off or the system asks for reduced motion. Chart colors were checked for color-vision deficiency in light and dark mode.
 
 For every proposed code the agents keep the supporting text, document and page, coding-system version, and whether the finding is confirmed or suspected.
 
@@ -53,11 +54,11 @@ Job stories for the adjuster, clinic and owner; task analysis of one claim revie
 
 ## Implementation
 
-Static site: `index.html` (interface), `agents.js` (the agents), `data.js` (vocabulary sample, insurer profiles, simulated owners, pets and visits). No build step, no backend. PDF.js and Tesseract.js load only when a file is uploaded.
+Static site: `index.html` (interface), `agents.js` (the agents), `charts.js` (D3.js charts with motion), `data.js` (vocabulary sample, insurer profiles, simulated owners, pets and visits), `dataset.js` (monthly counts and amount bins computed from the public claims data; no row-level data). No build step, no backend. D3.js 7.9.0 loads from cdnjs; PDF.js and Tesseract.js load only when a file is uploaded.
 
 ## Testing
 
-- **Done:** automated browser tests at laptop and phone width, light and dark (every screen, no script errors, no horizontal scrolling); a full claim run from sample upload to a packet approved by the Approval agent; a flagged claim handed to a person instead; the API refuses to turn agents on or approve.
+- **Done:** automated browser tests at laptop and phone width, light and dark (every screen, every chart rendered, hover details, no script errors, no horizontal scrolling); a full claim run from sample upload to a packet approved by the Approval agent; a flagged claim handed to a person instead; the API refuses to turn agents on or approve.
 - **Coding accuracy:** precision 1.00, recall 1.00, exact match 30 of 30 on a test set written alongside the agents. This shows the agents work as designed; it is not evidence of accuracy on real records.
 - **Planned:** a manually checked sample of real, consented SOAP notes; a usability test with 5 claims reviewers measuring task completion and the Single Ease Question.
 
