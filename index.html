@@ -204,6 +204,10 @@ svg.d3c .ghead .ring { fill: none; stroke-width: 2; opacity: 0; }
 svg.d3c .ghead.live .ring { animation: gpulse 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 .reduce svg.d3c .ghead.live .ring { animation: none; }
 @keyframes gpulse { 0% { opacity: .7; transform: scale(1); } 100% { opacity: 0; transform: scale(2.2); } }
+.spic { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent-soft); color: var(--accent); vertical-align: middle; flex: none; }
+.spic svg { width: 72%; height: 72%; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; } .spic svg .f { fill: currentColor; stroke: none; }
+.spic.big { width: 2.3rem; height: 2.3rem; }
+.sph { display: flex; align-items: center; gap: .5rem; }
 .emergcard { border-left: 4px solid var(--crit); background: linear-gradient(90deg, var(--crit-soft), var(--surface) 60%); }
 .step.emergstep .n { background: var(--crit); color: #fff; }
 tr.emerg td:first-child { box-shadow: inset 4px 0 0 var(--crit); }
@@ -247,10 +251,10 @@ tr.emerg td:first-child { box-shadow: inset 4px 0 0 var(--crit); }
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script>window.d3 || document.write('<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"><\/script>');</script>
-<script src="data.js?v=10"></script>
-<script src="dataset.js?v=10"></script>
-<script src="charts.js?v=10"></script>
-<script src="agents.js?v=10"></script>
+<script src="data.js?v=11"></script>
+<script src="dataset.js?v=11"></script>
+<script src="charts.js?v=11"></script>
+<script src="agents.js?v=11"></script>
 <script>
 (function () {
 "use strict";
@@ -458,6 +462,15 @@ function stepper(c, live) {
   return `<div class="stepper" role="list" aria-label="Claim steps">${out.join("")}</div>`;
 }
 
+// Species icons: simple line drawings, one per species the insurer covers.
+const SPECIES = {
+  dog: { label: "Dog", d: '<path d="M8 8.5c0-2.6 1.8-4.5 4-4.5s4 1.9 4 4.5V13c0 2.8-1.8 5-4 5s-4-2.2-4-5z"/><path d="M8.4 6.2C5.6 5 3.6 7.2 4.3 11.4c.3 1.7 1.9 2.2 3.1.9L8 10.8M15.6 6.2c2.8-1.2 4.8 1 4.1 5.2-.3 1.7-1.9 2.2-3.1.9L16 10.8"/><path d="M10.6 15.4h2.8L12 16.8z" class="f"/><circle cx="10.3" cy="10.6" r=".9" class="f"/><circle cx="13.7" cy="10.6" r=".9" class="f"/><path d="M12 16.8v1.2"/>' },
+  cat: { label: "Cat", d: '<path d="M5.5 4.5 8.3 8h7.4l2.8-3.5V13c0 3.6-2.9 6-6.5 6S5.5 16.6 5.5 13z"/><circle cx="9.6" cy="12" r=".9" class="f"/><circle cx="14.4" cy="12" r=".9" class="f"/><path d="M11.2 14.6h1.6L12 15.5z" class="f"/><path d="M4 14.2l4-.6M4 16.4l4-1M20 14.2l-4-.6M20 16.4l-4-1"/>' },
+  bird: { label: "Bird", d: '<path d="M5 13.5C5 9.4 8 6.5 11.6 6.5c1.9 0 3.3.9 4.1 2.2l4.3-.9-2.9 3c.2 4.9-3.2 8.2-7.4 8.2H6.5l1.9-2.6C6.4 16.2 5 15 5 13.5z"/><path d="M8.5 13.2c1.6 1.4 3.7 1.6 5.6.6"/><circle cx="14" cy="9.6" r=".9" class="f"/><path d="M10 19v2.5M13 19v2.5"/>' },
+  horse: { label: "Horse", d: '<path d="M9 21v-4.6C7 15.3 5.7 13.3 5.7 11c0-3.8 2.9-6.7 6.6-6.9L14.2 2l.9 2.6c3 1.6 4.9 4.7 4.9 8.3l-1.6 1.9-3.6-1.6-1.8 1.9V21"/><circle cx="14.6" cy="8.4" r=".9" class="f"/><path d="M8.6 6.2c-.6 2 0 4.2 1.4 5.6"/>' },
+  goat: { label: "Goat", d: '<path d="M8.6 7C7 5.9 6.3 4 7 2.5M15.4 7c1.6-1.1 2.3-3 1.6-4.5"/><path d="M7.5 8.5h9l-.9 5.6c-.3 2.3-1.9 4-3.6 4s-3.3-1.7-3.6-4z"/><path d="M7.5 9.2 4 10.6l3.8 1M16.5 9.2l3.5 1.4-3.8 1"/><path d="M11 18l1 3.2 1-3.2"/><circle cx="10.3" cy="11.6" r=".9" class="f"/><circle cx="13.7" cy="11.6" r=".9" class="f"/>' },
+};
+function spIcon(sp, big) { const x = SPECIES[sp] || SPECIES.dog; return `<span class="spic${big ? " big" : ""}" title="${x.label}" role="img" aria-label="${x.label}"><svg viewBox="0 0 24 24" aria-hidden="true">${x.d}</svg></span>`; }
 function emergPill(c) { return isEmerg(c) ? `<span class="pill crit" title="${h(c.emergency.reasons.join(", "))}"><span class="dot"></span>Emergency · first</span>` : ""; }
 function networkPill(c) { const cl = clinicOf(c.clinic); const ins = D.INSURERS[c.insurer || "northpaw"];
   if (!ins.directPayNetwork) return `<span class="pill muted">Network: not used by this insurer</span>`;
@@ -596,11 +609,11 @@ function viewDesk() {
         return `<div class="row" style="margin-top:.45rem;flex-wrap:nowrap;align-items:flex-start"><span class="dot" style="color:var(--${c.result.routing.toPerson ? "warn" : "good"});margin-top:.45em"></span><div style="flex:1"><b>SOAP note ${i + 1} · ${dshort(c.visit)} visit · ${h(clinicOf(c.clinic).name)}</b><div class="small muted">Coded ${tm(n.codedAt)}: ${h(conf.join(", ") || "no confirmed diagnosis")}${sus ? " · " + sus + " rule-out held back" : ""} · reviewer ${c.result.codes.every((x) => x.review.agree) ? "agrees" : "disagrees"}${c.result.history.flags.length ? " · pre-existing window flagged" : ""} · ${h(n.file)}</div></div><span class="mono muted">${tm(n.codedAt)}</span></div>`; }).join("")}</div></td></tr>`;
   const claimTable = (claims, withPet) => `<div class="scroll"><table class="wide"><thead><tr><th>Claim</th>${withPet ? "<th>Animal</th>" : ""}<th>Visit</th><th>Clinic</th><th>Network</th><th>SOAP notes</th><th>Codes</th><th style="text-align:right">Amount</th><th>Status and progress</th></tr></thead><tbody>
     ${claims.map((c) => { const p = petOf(c.pet); const conf = c.result.codes.filter((x) => x.status === "confirmed"); const open = S.openNotes.has(c.id);
-      return `<tr class="click${isEmerg(c) ? " emerg" : ""}" data-act="open" data-id="${c.id}" tabindex="0"><td class="mono">${c.id}${isEmerg(c) ? `<div style="margin-top:.2rem">${emergPill(c)}</div>` : ""}</td>${withPet ? `<td>${h(p.name)}</td>` : ""}<td class="nw">${dshort(c.visit)}</td><td>${h(clinicOf(c.clinic).name)}</td><td>${networkPill(c)}</td>
+      return `<tr class="click${isEmerg(c) ? " emerg" : ""}" data-act="open" data-id="${c.id}" tabindex="0"><td class="mono">${c.id}${isEmerg(c) ? `<div style="margin-top:.2rem">${emergPill(c)}</div>` : ""}</td>${withPet ? `<td class="nw">${spIcon(p.species)} ${h(p.name)}</td>` : ""}<td class="nw">${dshort(c.visit)}</td><td>${h(clinicOf(c.clinic).name)}</td><td>${networkPill(c)}</td>
       <td><button class="pill ai" style="border:0;cursor:pointer" data-act="notes" data-id="${c.id}" aria-expanded="${open}"><span class="dot"></span>${c.notes.length} of ${c.notes.length} coded ${open ? "▴" : "▾"}</button></td>
       <td>${conf.map((x) => h(x.term)).join(", ") || '<span class="muted">Suspected only</span>'}</td><td class="mono nw" style="text-align:right">${money(c.result.invoice.total)}</td><td>${statusPill(c)}<div class="nw" style="margin-top:.3rem">${(() => { const pg = progressOf(c); return `<span class="mgrow" data-p="${(pg.done / 8).toFixed(3)}" data-tone="${pg.tone}" title="${h(pg.now)}: ${Math.round(pg.done * 10) / 10} of 8 steps" role="img" aria-label="${h(pg.now)}, ${Math.floor(pg.done)} of 8 steps"><i></i></span> <span class="small muted">${Math.floor(pg.done)}/8</span>`; })()}</div></td></tr>${open ? notesPanel(c) : ""}`; }).join("")}</tbody></table></div>`;
   const animalCard = (p) => { const cl = S.claims.filter((c) => c.pet === p.id).sort(queueOrder); const left = Math.max(0, p.deductible - p.deductibleMet);
-    return `<div class="card"><div class="row" style="align-items:flex-start"><div style="flex:1"><div class="eyebrow">Animal</div><h2 style="margin-top:.15rem">${h(p.name)} · ${h(p.species)}, ${p.age}, ${h(p.breed)}</h2>
+    return `<div class="card"><div class="row" style="align-items:flex-start"><div style="flex:1"><div class="eyebrow">Animal</div><h2 style="margin-top:.15rem" class="sph">${spIcon(p.species, true)}<span>${h(p.name)} · ${h(p.species)}, ${p.age}, ${h(p.breed)}</span></h2>
       <div class="small muted">Enrolled ${dshort(p.coverageStart)} · Plan B-2024 · illness wait ended ${dshort(A.addDays(p.coverageStart, 14))} · ${cl.length} claim${cl.length === 1 ? "" : "s"} · <span style="color:var(--${left ? "ai" : "good"})">Yearly deductible: ${money(left)} left of ${money(p.deductible)}</span> · Plan cap: unlimited</div></div>
       <a class="btn" href="#new/pet/${p.id}">+ New claim for ${h(p.name)}</a></div><div style="margin-top:.7rem">${cl.length ? claimTable(cl, false) : `<p class="small muted">No claims yet.</p>`}</div></div>`; };
   let body = "";
@@ -679,7 +692,7 @@ function viewNew(arg) {
 
 function viewReview(id) {
   const c = claimOf(id || S.claim) || S.claims[0]; S.claim = c.id; const p = petOf(c.pet), o = ownerOf(p.owner), cl = clinicOf(c.clinic);
-  return `<div class="pagehead"><div class="t"><div class="eyebrow">Step 3 of 3 · Claim review · Claim ${c.id} · filed ${dt(c.filed)} · visit ${dshort(c.visit)}</div><h1>${h(p.name)}, ${p.age}-year-old ${h(p.breed)} · ${h((c.result.codes.find((x) => x.status === "confirmed") || c.result.codes[0] || { term: "no confirmed diagnosis" }).term.toLowerCase())}</h1>
+  return `<div class="pagehead"><div class="t"><div class="eyebrow">Step 3 of 3 · Claim review · Claim ${c.id} · filed ${dt(c.filed)} · visit ${dshort(c.visit)}</div><h1 class="sph">${spIcon(p.species, true)}<span>${h(p.name)}, ${p.age}-year-old ${h(p.breed)} · ${h((c.result.codes.find((x) => x.status === "confirmed") || c.result.codes[0] || { term: "no confirmed diagnosis" }).term.toLowerCase())}</span></h1>
     <div class="row small muted" style="margin-top:.2rem">${h(cl.name)}, ${h(cl.city)} · Attending veterinarian: as signed on the SOAP note · Owner: ${h(o.name)} · Policy ${h(o.policy)} ${networkPill(c)} ${statusPill(c)}</div></div>
     <div class="row"><label class="small muted" for="pick">Claim</label><select id="pick" data-act="pick" style="width:auto">${S.claims.map((x) => `<option value="${x.id}" ${x.id === c.id ? "selected" : ""}>${x.id} · ${h(petOf(x.pet).name)} · ${h(x.status)}</option>`).join("")}</select></div></div>
   ${emergCard(c)}${growCard(c)}
@@ -968,7 +981,7 @@ document.addEventListener("click", (e) => {
   else if (a === "motion") { S.reduce = !S.reduce; document.body.classList.toggle("reduce", S.reduce); t.textContent = S.reduce ? "Motion off" : "Motion on"; t.setAttribute("aria-pressed", String(!S.reduce)); pref("motion", S.reduce ? "off" : "on"); }
   else if (a === "addowner") { $("#ownerForm").innerHTML = `<div class="row" style="margin-top:.4rem"><input type="text" id="newOwner" placeholder="Owner name" style="flex:1"><button class="btn small primary" data-act="saveowner">Add</button></div>`; $("#newOwner").focus(); }
   else if (a === "saveowner") { const n = $("#newOwner").value.trim(); if (!n) return; const id = "o" + (S.owners.length + 1); S.owners.push({ id, name: n, city: "Arizona", policy: "NPM-" + (20700 + S.owners.length) }); S.owner = id; route(); }
-  else if (a === "addpet") { $("#petForm").innerHTML = `<div class="row" style="margin-top:.5rem"><input type="text" id="npName" placeholder="Name" style="flex:1"><select id="npSp" style="width:auto"><option value="dog">Dog</option><option value="cat">Cat</option></select><input type="text" id="npBreed" placeholder="Breed" style="flex:1"><button class="btn small primary" data-act="savepet">Add animal</button></div>`; $("#npName").focus(); }
+  else if (a === "addpet") { $("#petForm").innerHTML = `<div class="row" style="margin-top:.5rem"><input type="text" id="npName" placeholder="Name" style="flex:1"><select id="npSp" style="width:auto">${Object.entries(SPECIES).map(([k, x]) => `<option value="${k}">${x.label}</option>`).join("")}</select><input type="text" id="npBreed" placeholder="Breed" style="flex:1"><button class="btn small primary" data-act="savepet">Add animal</button></div>`; $("#npName").focus(); }
   else if (a === "savepet") { const n = $("#npName").value.trim(); if (!n) return; S.pets.push({ id: "p" + (S.pets.length + 1), owner: S.owner, name: n, species: $("#npSp").value, breed: $("#npBreed").value.trim() || "mixed", age: 1, coverageStart: new Date().toISOString().slice(0, 10), deductible: 250, deductibleMet: 0, history: [] }); route(); }
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") stopAll(); if (e.key === "Enter" && e.target.matches("tr.click")) location.hash = "#review/" + e.target.dataset.id; });
