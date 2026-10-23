@@ -86,18 +86,19 @@
       const n = nodes.filter((d) => d === stage).select("circle");
       n.interrupt().classed("on", true).transition().duration(dur(500)).on("end", () => n.classed("on", false));
     }
-    function pulse(outcome) {
+    function pulse(outcome, emergency) {
       // outcome: "auto" | "person" | "ready"
       const end = outcome === "person" ? tPer : outcome === "auto" ? tAuto : { x: xs("Approve"), y: midY };
       const lastStage = outcome === "person" ? 4 : 6;
       if (API.reduce()) { glow(STAGES[lastStage]); return; }
-      const dot = layer.append("circle").attr("class", "packet").attr("r", 6).attr("cx", xs(STAGES[0])).attr("cy", midY).style("fill", C.ai);
+      const sp = emergency ? 0.4 : 1;
+      const dot = layer.append("circle").attr("class", "packet" + (emergency ? " emerg" : "")).attr("r", emergency ? 8 : 6).attr("cx", xs(STAGES[0])).attr("cy", midY).style("fill", C.ai);
       let tr = dot.transition().duration(1);
       for (let i = 0; i <= lastStage; i++) {
         const s = STAGES[i];
-        tr = tr.transition().duration(i === 0 ? 200 : 330).ease(d3.easeCubicInOut).attr("cx", xs(s)).on("end", () => glow(s));
+        tr = tr.transition().duration((i === 0 ? 200 : 330) * sp).ease(d3.easeCubicInOut).attr("cx", xs(s)).on("end", () => glow(s));
       }
-      tr.transition().duration(480).ease(d3.easeCubicInOut).attrTween("transform", () => {
+      tr.transition().duration(480 * sp).ease(d3.easeCubicInOut).attrTween("transform", () => {
         const p = svg.append("path").attr("d", outcome === "ready" ? `M${end.x},${end.y}L${end.x},${end.y}` : link({ x: xs(STAGES[lastStage]), y: midY }, end)).attr("visibility", "hidden").node();
         const L = p.getTotalLength(), x0 = xs(STAGES[lastStage]);
         return (t) => { const pt = p.getPointAtLength(t * L); if (t === 1) p.remove(); return `translate(${pt.x - x0},${pt.y - midY})`; };
@@ -131,13 +132,16 @@
       const sel = bars.selectAll("path").data(data, (d) => d.id);
       sel.exit().transition().duration(dur(400)).attr("transform", `translate(${-x.step()},0)`).style("opacity", 0).remove();
       const en = sel.enter().append("path").attr("transform", `translate(${iw},0)`).attr("d", (d) => vbar(off, ih, bw, 0, 4)).style("fill", (d) => OUT[d.outcome][1]);
-      en.merge(sel).on("mousemove", (ev, d) => showTip(ev, `<b>Claim ${esc(d.label)}</b><br>${(d.ms / 1000).toFixed(1)} s to code<br>${sw(OUT[d.outcome][1])}${esc(OUT[d.outcome][0])}`)).on("mouseleave", hideTip)
+      en.merge(sel).on("mousemove", (ev, d) => showTip(ev, `<b>Claim ${esc(d.label)}</b>${d.emergency ? " · emergency, taken first" : ""}<br>${(d.ms / 1000).toFixed(1)} s to code<br>${sw(OUT[d.outcome][1])}${esc(OUT[d.outcome][0])}`)).on("mouseleave", hideTip)
         .transition().duration(dur(600)).ease(d3.easeCubicOut)
         .attr("transform", (d) => `translate(${x(d.id)},0)`)
         .attr("d", (d) => vbar(off, y(d.ms / 1000), bw, ih - y(d.ms / 1000), 4));
+      const em = data.filter((d) => d.emergency);
+      g.selectAll("text.em").data(em, (d) => d.id).join((e) => e.append("text").attr("class", "em").attr("text-anchor", "middle").text("E").attr("x", iw).attr("y", ih))
+        .transition().duration(dur(600)).ease(d3.easeCubicOut).attr("x", (d) => x(d.id) + x.bandwidth() / 2).attr("y", (d) => y(d.ms / 1000) - 5);
       g.selectAll("line.base").data([0]).join("line").attr("class", "base").attr("x1", 0).attr("x2", iw).attr("y1", ih).attr("y2", ih);
     }
-    return { update, legend: legend(Object.values(OUT)) };
+    return { update, legend: legend(Object.values(OUT)) + '<div class="small muted" style="margin-top:.2rem">E above a bar = emergency claim, taken first by the Emergency agent.</div>' };
   };
 
   // ---------- 3. Error rate per agent, with the 5% warning line ----------
@@ -190,7 +194,7 @@
     grid(g, x, steps.length * rowH, true, narrow ? 3 : 5, fmtMs);
     g.selectAll("text.rl").data(steps).join("text").attr("class", "rl").attr("x", -8).attr("y", (d) => y(d.label) + y.bandwidth() / 2).attr("dy", "0.32em").attr("text-anchor", "end").text((d) => d.label);
     const bh = Math.min(18, y.bandwidth());
-    const bars = g.selectAll("path.b").data(steps).join("path").attr("class", "b").style("fill", (d) => d.warn ? C.warn : d.kind === "approve" ? C.good : C.ai)
+    const bars = g.selectAll("path.b").data(steps).join("path").attr("class", "b").style("fill", (d) => d.kind === "emergency" ? "var(--crit)" : d.warn ? C.warn : d.kind === "approve" ? C.good : C.ai)
       .on("mousemove", (ev, d) => showTip(ev, `<b>${esc(d.label)}</b><br>${esc(d.agents)}<br>Started at +${fmtMs(d.start)}, took ${fmtMs(d.ms)}${d.warn ? "<br>Flagged for a person" : ""}`)).on("mouseleave", hideTip);
     const vals = g.selectAll("text.v").data(steps).join("text").attr("class", "v").attr("y", (d) => y(d.label) + y.bandwidth() / 2).attr("dy", "0.32em").text((d) => fmtMs(d.ms));
     const scan = g.append("line").attr("class", "scan").attr("y1", -4).attr("y2", steps.length * rowH);

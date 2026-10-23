@@ -186,7 +186,8 @@ svg.d3c .track { stroke: var(--line); stroke-width: 3; fill: none; stroke-lineca
 svg.d3c .node circle.nd { fill: var(--surface); stroke: var(--ink-3); stroke-width: 2; transition: fill .3s, stroke .3s; }
 svg.d3c .node circle.nd.on { fill: var(--ai-soft); stroke: var(--c-ai); }
 svg.d3c .term circle { stroke: var(--surface); stroke-width: 2; }
-svg.d3c .packet { stroke: var(--surface); stroke-width: 2; }
+svg.d3c .packet { stroke: var(--surface); stroke-width: 2; } svg.d3c .packet.emerg { stroke: var(--crit); stroke-width: 3; }
+svg.d3c text.em { fill: var(--crit); font-weight: 700; font-size: 11px; }
 svg.d3c .lim line { stroke: var(--crit); stroke-width: 2; stroke-dasharray: 4 3; }
 svg.d3c .lim text { fill: var(--crit); font-weight: 700; font-size: 11px; }
 svg.d3c .area { opacity: .1; } svg.d3c .ln { fill: none; stroke-width: 2; }
@@ -203,6 +204,9 @@ svg.d3c .ghead .ring { fill: none; stroke-width: 2; opacity: 0; }
 svg.d3c .ghead.live .ring { animation: gpulse 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 .reduce svg.d3c .ghead.live .ring { animation: none; }
 @keyframes gpulse { 0% { opacity: .7; transform: scale(1); } 100% { opacity: 0; transform: scale(2.2); } }
+.emergcard { border-left: 4px solid var(--crit); background: linear-gradient(90deg, var(--crit-soft), var(--surface) 60%); }
+.step.emergstep .n { background: var(--crit); color: #fff; }
+tr.emerg td:first-child { box-shadow: inset 4px 0 0 var(--crit); }
 .mgrow { display: inline-block; width: 5rem; height: .55rem; border-radius: 99px; background: var(--muted); overflow: hidden; vertical-align: middle; }
 .mgrow i { display: block; height: 100%; border-radius: 99px; width: 0; }
 .growcard .row { align-items: center; }
@@ -269,9 +273,9 @@ const S = {
   owners: D.OWNERS.map((o) => Object.assign({}, o)), pets: D.PETS.map((p) => Object.assign({}, p, { history: p.history.slice() })),
   claims: [], view: "owner", owner: "o1", claim: "4821", master: true, insurer: "northpaw",
   draft: null, log: [], corrections: [], undo: [], eval: null, reduce: false, q: "", openNotes: new Set(), autoApprove: true, ceiling: 500,
-  ops: { coded: 0, handed: 0, auto: 0, queue: 23, errors: 0, tasks: 0, durations: [], recent: [], seq: 0, started: Date.now() },
+  ops: { coded: 0, handed: 0, auto: 0, emerg: 0, emergMs: [], queue: 23, errors: 0, tasks: 0, durations: [], recent: [], seq: 0, started: Date.now() },
 };
-const AGENTS = ["Reader", "Privacy guard", "Fact extractor", "Diagnosis matcher", "Invoice coder", "Validator", "Code reviewer", "Requirements agent", "History agent", "Router", "Packet agent", "Approval agent"];
+const AGENTS = ["Reader", "Privacy guard", "Fact extractor", "Diagnosis matcher", "Invoice coder", "Validator", "Code reviewer", "Requirements agent", "History agent", "Router", "Packet agent", "Approval agent", "Emergency agent"];
 const SECURITY = ["Bot defense", "Account security", "API integrity", "Data access audit", "Warning agent"];
 const AG = {};
 [...AGENTS, ...SECURITY].forEach((n) => { AG[n] = { name: n, security: SECURITY.includes(n), paused: false, run: 0, down: 0, tasks: 0, errors: 0, ms: [] }; });
@@ -285,12 +289,45 @@ const claimOf = (id) => S.claims.find((c) => c.id === id);
 
 function log(agent, text, kind) { S.log.unshift({ t: new Date().toISOString(), agent, text, kind: kind || "info" }); S.log.length = Math.min(S.log.length, 80); }
 
+// ---------- Emergency agent ----------
+// Reads the raw note, invoice and clinic before any other agent. A flagged claim is coded first, on a fast lane
+// (each step about 2.5 times faster), and goes to the front of a person's queue. It never approves, pays or denies.
+const EMERG_TEXT = [[/\bemergenc/i, "note or invoice says emergency"], [/toxin|ingest|chocolate|xylitol|rodenticide|antifreeze|poison/i, "possible poisoning"], [/hit by (a )?car|\bHBC\b|trauma/i, "trauma"],
+  [/dyspnea|respiratory distress|cyanos|open-mouth breathing/i, "trouble breathing"], [/collapse|unresponsive|unconscious/i, "collapse"], [/seizur/i, "seizure"], [/bloat|GDV|gastric dilatation/i, "possible bloat"],
+  [/urethral obstruction|blocked cat|unable to urinate/i, "urinary blockage"], [/hemorrhag|bleeding heavily|uncontrolled bleeding/i, "heavy bleeding"], [/hospitaliz|overnight|\bICU\b|oxygen cage|transfusion/i, "hospitalized"]];
+function emergencyScan(c) {
+  const why = []; const txt = c.notes.map((n) => n.text).join("\n") + "\n" + (c.invoiceText || ""); const cl = clinicOf(c.clinic);
+  if (c.emergencyFlag) why.push("flagged as an emergency by " + (c.emergencyFlag === true ? "a person" : c.emergencyFlag));
+  if (/emergency|after-hours/i.test(cl.name)) why.push("emergency or after-hours clinic");
+  for (const [re, label] of EMERG_TEXT) if (re.test(txt) && !why.includes(label)) why.push(label);
+  return why;
+}
+function emergencyOn() { return S.master && !AG["Emergency agent"].paused; }
+function fastLane(r, t0, k) {
+  // Speeds up the simulated step times and rebuilds every timestamp from the start time.
+  let clock = t0; for (const s of r.steps) { s.ms = Math.max(1, Math.round(s.ms * k)); clock += s.ms; s.at = new Date(clock).toISOString(); }
+  r.totalMs = r.steps.reduce((a, s) => a + s.ms, 0);
+  if (r.packet && r.packet.auditTrail) r.packet.auditTrail = r.steps.map((s) => ({ step: s.n + " " + s.name, agents: s.agents, at: s.at, ms: s.ms, result: s.result }));
+}
+
 function code(claim, opts) {
   const pet = petOf(claim.pet); const clinic = clinicOf(claim.clinic);
   const notes = claim.notes.map((n) => n.text).join("\n");
+  const ewhy = claim.emergencyFlag === false ? [] : emergencyScan(claim); const triageMs = 140;
+  const emergency = ewhy.length > 0 && emergencyOn();
+  if (ewhy.length && !emergencyOn()) log("Router", "Claim " + claim.id + " looks like an emergency, but the Emergency agent is not running; it waits in the normal order.", "warn");
   const r = A.run({ note: notes, invoice: claim.invoiceText, pet, insurer: claim.insurer || "northpaw", visit: claim.visit, docType: claim.docType, paid: claim.paid,
     claimId: claim.id, clinicName: clinic.name, noteFile: claim.notes[0] && claim.notes[0].file, invoiceFile: claim.invoiceFile, notePages: claim.notes.reduce((a, n) => a + (n.pages || 1), 0), invoicePages: claim.invoicePages || 1,
-    startedAt: claim.filed, simulatedDurations: !!(opts && opts.sim), extraMs: opts && opts.extraMs });
+    startedAt: emergency ? new Date(new Date(claim.filed).getTime() + triageMs).toISOString() : claim.filed, simulatedDurations: !!(opts && opts.sim), extraMs: opts && opts.extraMs });
+  if (emergency && opts && opts.sim) fastLane(r, new Date(claim.filed).getTime() + triageMs, 0.4);
+  if (emergency) {
+    const ins = D.INSURERS[claim.insurer || "northpaw"]; const urgentCodes = ["Toxin ingestion", "Urethral obstruction", "Gastrointestinal foreign body", "Congestive heart failure", "Seizure", "Fracture", "Pneumonia", "Hemangiosarcoma", "Bite wound"];
+    const conf = r.codes.filter((x) => x.status === "confirmed" && urgentCodes.includes(x.term)).map((x) => x.term);
+    claim.emergency = { by: "Emergency agent", at: new Date(new Date(claim.filed).getTime() + triageMs).toISOString(), ms: triageMs, reasons: ewhy, confirmed: conf,
+      fastTrack: ins.id === "pumpkin" && r.invoice.total >= 500 ? "Eligible for the insurer's fast track for care of $500 or more (PumpkinNow)" : null };
+    if (r.routing.toPerson) r.routing.reasons.unshift("Emergency: reviewed first by the Emergency agent; this claim is at the front of your queue.");
+    AG["Emergency agent"].tasks++; AG["Emergency agent"].ms.push(triageMs);
+  } else claim.emergency = null;
   claim.result = r; claim.notes.forEach((n) => { n.codedAt = r.steps[1].at; });
   if (!claim.decision) claim.status = claim.docType === "estimate" && !r.routing.toPerson ? "Estimate ready" : r.routing.toPerson ? "Needs a person" : "Ready to submit";
   if (!claim.decision && !(opts && opts.noAuto)) approvalAgent(claim);
@@ -332,11 +369,13 @@ function boot() {
   S.eval = A.evaluate();
   S.claims.filter((c) => /Needs/.test(c.status)).forEach((c) => S.openNotes.add(c.id));
   S.ops.coded = 412; S.ops.handed = 161; S.ops.auto = 214; S.ops.errors = 4; S.ops.tasks = 412;
-  for (const c of S.claims) S.ops.durations.push(c.result.totalMs);
+  for (const c of S.claims) { S.ops.durations.push(c.result.totalMs); if (isEmerg(c)) { S.ops.emerg++; S.ops.emergMs.push(c.result.totalMs); } }
+  for (let i = 0; i < 12; i++) S.ops.emergMs.push(900 + rnd() * 900);
   for (let i = 0; i < 40; i++) S.ops.durations.push(2600 + rnd() * 3000);
   for (let i = 0; i < 30; i++) { const u = rnd(); recent(u < 0.39 ? "person" : u < 0.93 ? "auto" : "ready", 2600 + rnd() * 3000, "Q-" + (7000 + i)); }
   log("Router", "Claim 4821 handed to a person: possible pre-existing condition.", "warn");
   log("Packet agent", "Claim 4630 packet produced and approved.", "good");
+  if (claimOf("4862") && isEmerg(claimOf("4862"))) log("Emergency agent", "Claim 4862 flagged as an emergency (" + claimOf("4862").emergency.reasons.join(", ") + "); coded first and moved to the front of your queue.", "crit");
 }
 
 // ---------- live operations ----------
@@ -344,6 +383,9 @@ function median(a) { const s = a.slice().sort((x, y) => x - y); return s.length 
 function p95(a) { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length * 0.95)] : 0; }
 // Every coded claim is recorded once for the live charts: outcome, time to code and a label.
 function recent(outcome, ms, label) { S.ops.seq++; S.ops.recent.push({ id: S.ops.seq, outcome, ms, label }); if (S.ops.recent.length > 60) S.ops.recent.shift(); return outcome; }
+const isEmerg = (c) => !!(c && c.emergency);
+const openEmerg = (c) => isEmerg(c) && !/Submitted/.test(c.status || "");
+const queueOrder = (a, b) => (openEmerg(b) - openEmerg(a)) || b.filed.localeCompare(a.filed);
 function outcomeOf(c) { return c.result.routing.toPerson ? "person" : c.decision && c.decision.by === "Approval agent" ? "auto" : "ready"; }
 // Where a claim is in the process: 8 stages, the last two belong to people (or the Approval agent).
 const STAGE_LABELS = ["Extract", "Match", "Validate", "Requirements", "Route", "Packet", "Approve", "Submitted"];
@@ -364,7 +406,7 @@ function renderLive() {
   $("#live").innerHTML = `<span class="livetag ${S.master ? "" : "off"}"><span class="dot ${S.master ? "pulse" : ""}"></span>${S.master ? "LIVE" : "AGENTS OFF"}</span>` +
     m("Agents working", working() + " of " + AGENTS.length) + m("In queue", o.queue + " claims") + m("Coded today", o.coded) + m("Median time to code", (median(o.durations) / 1000).toFixed(1) + " s") +
     m("Auto-approved", Math.round(100 * o.auto / Math.max(1, o.coded)) + "%") + m("Handed to a person", Math.round(100 * o.handed / Math.max(1, o.coded)) + "%") +
-    m("Error rate", (100 * o.errors / Math.max(1, o.tasks)).toFixed(1) + "%") + m("Uptime 60 d", (100 * up).toFixed(1) + "%") + m("Security agents", "5 running") +
+    m("Error rate", (100 * o.errors / Math.max(1, o.tasks)).toFixed(1) + "%") + m("Uptime 60 d", (100 * up).toFixed(1) + "%") + m("Emergencies first", o.emerg + " · median " + (median(o.emergMs) / 1000).toFixed(1) + " s") + m("Security agents", "5 running") +
     `<span class="spacer"></span><span class="mono muted">Updated ${tm(new Date().toISOString())} MST · simulated feed</span>`;
 }
 let tickN = 0;
@@ -372,6 +414,15 @@ function tick() {
   tickN++;
   for (const a of Object.values(AG)) { const on = a.security || (S.master && !a.paused); if (on) a.run += 1000; else a.down += 1000; }
   if (S.master && tickN % 5 === 0) S.ops.queue += 1;
+  if (emergencyOn() && tickN > 4 && rnd() < 0.025) {
+    // An emergency claim arrives; the Emergency agent takes it ahead of everything waiting in the queue.
+    const r = A.run({ note: "S: Emergency visit. Ate xylitol gum 30 minutes ago.\nO: Weak, glucose low.\nA: Toxin ingestion.\nP: IV dextrose, hospitalized overnight.", invoice: "Emergency exam 1 145.00\nIV fluids 1 210.00\nHospitalization, overnight 1 380.00\nTotal 735.00", insurer: "northpaw" });
+    const ms = 900 + rnd() * 900; S.ops.coded++; S.ops.tasks++; S.ops.emerg++; S.ops.emergMs.push(ms); S.ops.durations.push(ms); S.ops.handed++; AG["Emergency agent"].tasks++;
+    for (const st of r.steps) for (const a of st.agents) if (AG[a]) AG[a].tasks++;
+    const id = "E-" + (8100 + S.ops.seq); recent("person", ms, id); S.ops.recent[S.ops.recent.length - 1].emergency = true;
+    log("Emergency agent", "Emergency claim " + id + " (possible poisoning) jumped ahead of " + S.ops.queue + " queued claims; coded in " + (ms / 1000).toFixed(1) + " s and sent to the front of a person's queue.", "crit");
+    liveCharts("person", true);
+  }
   if (S.master && tickN % 6 === 0 && S.ops.queue > 0) {
     // A simulated claim arrives from the queue; the real agents code it.
     const [note] = D.GOLD[Math.floor(rnd() * D.GOLD.length)];
@@ -396,6 +447,7 @@ function tick() {
 function stepper(c, live) {
   const r = c.result; const out = [];
   const lab = ["Extract facts", "Match codes", "Validate", "Requirements", "Route", "Claim packet"];
+  if (isEmerg(c)) out.push(`<div class="step done emergstep"><span class="n">E</span><div><b>Emergency review</b><span class="mono">${tm(c.emergency.at)} · ${c.emergency.ms} ms</span><small>Emergency agent: first in line</small></div></div>`);
   r.steps.forEach((s, i) => {
     const warn = (i === 2 && r.codes.some((x) => !x.review.agree || !x.validation.supported)) || (i === 3 && (r.history.flags.length || r.requirements.some((q) => q.required && !q.ok))) || (i === 4 && r.routing.toPerson);
     out.push(`<div class="step ${warn ? "warn" : "done"}"><span class="n">${warn ? "!" : "✓"}</span><div><b>${s.n} ${lab[i]}</b><span class="mono">${tm(s.at)} · ${s.ms < 1000 ? s.ms + " ms" : (s.ms / 1000).toFixed(1) + " s"}</span><small>${h(s.agents.join(", "))}</small></div></div>`);
@@ -406,6 +458,7 @@ function stepper(c, live) {
   return `<div class="stepper" role="list" aria-label="Claim steps">${out.join("")}</div>`;
 }
 
+function emergPill(c) { return isEmerg(c) ? `<span class="pill crit" title="${h(c.emergency.reasons.join(", "))}"><span class="dot"></span>Emergency · first</span>` : ""; }
 function networkPill(c) { const cl = clinicOf(c.clinic); const ins = D.INSURERS[c.insurer || "northpaw"];
   if (!ins.directPayNetwork) return `<span class="pill muted">Network: not used by this insurer</span>`;
   return cl.inNetwork ? `<span class="pill good" title="Direct pay to the clinic is possible"><span class="dot"></span>In network</span>` : `<span class="pill warn" title="Owner pays and is reimbursed"><span class="dot"></span>Out of network</span>`; }
@@ -509,6 +562,15 @@ function reviewButton(c) {
   if (c.review && c.review.state === "open") return `<button class="btn ai" data-act="reviewdone" data-id="${c.id}">✓ Complete human review</button>`;
   return `<button class="btn" data-act="humanreview" data-id="${c.id}">👤 Human review</button>`;
 }
+function emergCard(c) {
+  if (!isEmerg(c)) return /Submitted/.test(c.status) ? "" : `<div class="row noprint" style="justify-content:flex-end;margin-bottom:.5rem"><button class="btn small" data-act="emergflag" data-id="${c.id}">🚨 Flag as emergency</button></div>`;
+  const e = c.emergency; const routine = median(S.ops.durations.filter((x) => x > 2000)) || 4000;
+  return `<div class="card emergcard" style="margin-bottom:.8rem"><div class="row"><div style="flex:1;min-width:15rem"><div class="eyebrow" style="color:var(--crit)">Emergency agent · reviewed first · ${tm(e.at)}</div>
+    <h3 style="margin:.15rem 0 .2rem">Emergency claim: coded ahead of the queue in ${(c.result.totalMs / 1000).toFixed(1)} s${c.result.totalMs < routine ? ", about " + (routine / Math.max(1, c.result.totalMs)).toFixed(1) + "× faster than a routine claim" : ""}</h3>
+    <div class="small"><b>Why:</b> ${h(e.reasons.join("; "))}${e.confirmed.length ? " · <b>urgent codes confirmed:</b> " + h(e.confirmed.join(", ")) : ""}</div>
+    <div class="small muted" style="margin-top:.2rem">${e.fastTrack ? h(e.fastTrack) + " · " : ""}${c.decision ? "Decided: " + h(c.decision.label || "approved") + "." : c.result.routing.toPerson ? "First in a person's queue." : "No open questions; first in line for a person's OK."} The Emergency agent never approves, pays or denies.</div></div>
+    <button class="btn small" data-act="emergflag" data-id="${c.id}" data-off="1">Not an emergency</button></div></div>`;
+}
 function growCard(c) {
   const pg = progressOf(c);
   return `<div class="card growcard" style="margin-bottom:.8rem"><div class="row"><div style="flex:1;min-width:14rem"><div class="eyebrow ai">Claim ${c.id} in the process · ${Math.floor(pg.done)} of 8 steps</div><h3 style="margin:.15rem 0 0">${h(pg.now)}</h3></div>${reviewButton(c)}</div>
@@ -523,18 +585,21 @@ function viewDesk() {
     return [o.name, o.city, o.policy, ...pets.map((p) => p.name + " " + p.breed), ...cl.map((c) => c.id + " " + clinicOf(c.clinic).name)].join(" ").toLowerCase().includes(q); };
   const ownerBadge = (o) => { const pets = S.pets.filter((p) => p.owner === o.id); const cl = S.claims.filter((c) => pets.some((p) => p.id === c.pet));
     const need = cl.filter((c) => /Needs/.test(c.status)).length, open = cl.filter((c) => !c.decision && !/Needs/.test(c.status)).length;
+    const em = cl.filter((c) => isEmerg(c) && !c.decision).length;
+    if (em) return `<span class="pill crit"><span class="dot"></span>${em} emergency</span>`;
     return need ? `<span class="pill warn"><span class="dot"></span>${need} need${need > 1 ? "" : "s"} you</span>` : open ? `<span class="pill ai"><span class="dot"></span>${open} ready</span>` : `<span class="pill good"><span class="dot"></span>All submitted</span>`; };
-  const ownersList = S.owners.filter(matches).map((o) => { const pets = S.pets.filter((p) => p.owner === o.id); const cl = S.claims.filter((c) => pets.some((p) => p.id === c.pet));
+  const ownerEm = (o) => S.claims.some((c) => isEmerg(c) && !c.decision && petOf(c.pet).owner === o.id);
+  const ownersList = S.owners.filter(matches).sort((a, b) => ownerEm(b) - ownerEm(a)).map((o) => { const pets = S.pets.filter((p) => p.owner === o.id); const cl = S.claims.filter((c) => pets.some((p) => p.id === c.pet));
     return `<button class="owner" data-act="owner" data-id="${o.id}" aria-pressed="${o.id === S.owner}"><span class="av">${h(o.name.replace(/[^A-Z]/g, ""))}</span><span style="flex:1;min-width:0"><b>${h(o.name)}</b><span class="small muted" style="display:block">${pets.length} animal${pets.length === 1 ? "" : "s"} · ${cl.length} claim${cl.length === 1 ? "" : "s"}</span></span>${ownerBadge(o)}</button>`; }).join("") || `<p class="small muted">No owner matches "${h(S.q)}".</p>`;
   const notesPanel = (c) => `<tr class="notesrow"><td colspan="9"><div class="notes"><div class="row"><span class="eyebrow ai" style="flex:1">SOAP notes on claim ${c.id} · each coded by the agents</span><a class="btn small" href="#new/add/${c.id}">+ Add SOAP note</a></div>
       ${c.notes.map((n, i) => { const conf = c.result.codes.filter((x) => x.status === "confirmed").map((x) => x.term.toLowerCase()); const sus = c.result.codes.filter((x) => x.status !== "confirmed").length;
         return `<div class="row" style="margin-top:.45rem;flex-wrap:nowrap;align-items:flex-start"><span class="dot" style="color:var(--${c.result.routing.toPerson ? "warn" : "good"});margin-top:.45em"></span><div style="flex:1"><b>SOAP note ${i + 1} · ${dshort(c.visit)} visit · ${h(clinicOf(c.clinic).name)}</b><div class="small muted">Coded ${tm(n.codedAt)}: ${h(conf.join(", ") || "no confirmed diagnosis")}${sus ? " · " + sus + " rule-out held back" : ""} · reviewer ${c.result.codes.every((x) => x.review.agree) ? "agrees" : "disagrees"}${c.result.history.flags.length ? " · pre-existing window flagged" : ""} · ${h(n.file)}</div></div><span class="mono muted">${tm(n.codedAt)}</span></div>`; }).join("")}</div></td></tr>`;
   const claimTable = (claims, withPet) => `<div class="scroll"><table class="wide"><thead><tr><th>Claim</th>${withPet ? "<th>Animal</th>" : ""}<th>Visit</th><th>Clinic</th><th>Network</th><th>SOAP notes</th><th>Codes</th><th style="text-align:right">Amount</th><th>Status and progress</th></tr></thead><tbody>
     ${claims.map((c) => { const p = petOf(c.pet); const conf = c.result.codes.filter((x) => x.status === "confirmed"); const open = S.openNotes.has(c.id);
-      return `<tr class="click" data-act="open" data-id="${c.id}" tabindex="0"><td class="mono">${c.id}</td>${withPet ? `<td>${h(p.name)}</td>` : ""}<td class="nw">${dshort(c.visit)}</td><td>${h(clinicOf(c.clinic).name)}</td><td>${networkPill(c)}</td>
+      return `<tr class="click${isEmerg(c) ? " emerg" : ""}" data-act="open" data-id="${c.id}" tabindex="0"><td class="mono">${c.id}${isEmerg(c) ? `<div style="margin-top:.2rem">${emergPill(c)}</div>` : ""}</td>${withPet ? `<td>${h(p.name)}</td>` : ""}<td class="nw">${dshort(c.visit)}</td><td>${h(clinicOf(c.clinic).name)}</td><td>${networkPill(c)}</td>
       <td><button class="pill ai" style="border:0;cursor:pointer" data-act="notes" data-id="${c.id}" aria-expanded="${open}"><span class="dot"></span>${c.notes.length} of ${c.notes.length} coded ${open ? "▴" : "▾"}</button></td>
       <td>${conf.map((x) => h(x.term)).join(", ") || '<span class="muted">Suspected only</span>'}</td><td class="mono nw" style="text-align:right">${money(c.result.invoice.total)}</td><td>${statusPill(c)}<div class="nw" style="margin-top:.3rem">${(() => { const pg = progressOf(c); return `<span class="mgrow" data-p="${(pg.done / 8).toFixed(3)}" data-tone="${pg.tone}" title="${h(pg.now)}: ${Math.round(pg.done * 10) / 10} of 8 steps" role="img" aria-label="${h(pg.now)}, ${Math.floor(pg.done)} of 8 steps"><i></i></span> <span class="small muted">${Math.floor(pg.done)}/8</span>`; })()}</div></td></tr>${open ? notesPanel(c) : ""}`; }).join("")}</tbody></table></div>`;
-  const animalCard = (p) => { const cl = S.claims.filter((c) => c.pet === p.id).sort((a, b) => b.visit.localeCompare(a.visit)); const left = Math.max(0, p.deductible - p.deductibleMet);
+  const animalCard = (p) => { const cl = S.claims.filter((c) => c.pet === p.id).sort(queueOrder); const left = Math.max(0, p.deductible - p.deductibleMet);
     return `<div class="card"><div class="row" style="align-items:flex-start"><div style="flex:1"><div class="eyebrow">Animal</div><h2 style="margin-top:.15rem">${h(p.name)} · ${h(p.species)}, ${p.age}, ${h(p.breed)}</h2>
       <div class="small muted">Enrolled ${dshort(p.coverageStart)} · Plan B-2024 · illness wait ended ${dshort(A.addDays(p.coverageStart, 14))} · ${cl.length} claim${cl.length === 1 ? "" : "s"} · <span style="color:var(--${left ? "ai" : "good"})">Yearly deductible: ${money(left)} left of ${money(p.deductible)}</span> · Plan cap: unlimited</div></div>
       <a class="btn" href="#new/pet/${p.id}">+ New claim for ${h(p.name)}</a></div><div style="margin-top:.7rem">${cl.length ? claimTable(cl, false) : `<p class="small muted">No claims yet.</p>`}</div></div>`; };
@@ -551,7 +616,7 @@ function viewDesk() {
       <div class="stat"><small>Animals</small><b>${pets.length}</b></div><div class="stat"><small>Claims this year</small><b>${cl.length}</b></div><div class="stat"><small>SOAP notes coded</small><b>${cl.reduce((a, c) => a + c.notes.length, 0)} of ${cl.reduce((a, c) => a + c.notes.length, 0)}</b></div><div class="stat"><small>Billed this year</small><b>${money(billed)}</b></div><button class="btn" data-act="addpet">+ Add animal</button></div><div id="petForm"></div></div>
       ${sysCard(cl, h(o.name) + "'s animals")}${pets.map(animalCard).join("")}</div></div>`;
   } else if (S.view === "animal") body = `<div class="stack">${sysCard(S.claims, "all animals")}${S.pets.map(animalCard).join("")}</div>`;
-  else body = `<div class="stack">${sysCard(S.claims, "all claims")}<div class="card">${claimTable(S.claims.slice().sort((a, b) => b.filed.localeCompare(a.filed)), true)}</div></div>`;
+  else body = `<div class="stack">${sysCard(S.claims, "all claims")}<div class="card">${claimTable(S.claims.slice().sort(queueOrder), true)}</div></div>`;
   return `<div class="pagehead"><div class="t"><div class="eyebrow">Step 1 of 3 · Claims desk</div><h1 style="margin-top:.15rem">Every SOAP note, coded by agents, by owner, animal and claim</h1></div>
     <div class="seg" role="group" aria-label="View by"><span class="small" style="font-weight:700;padding:0 .3rem 0 .5rem;align-self:center">View by</span>${["owner", "animal", "claim"].map((v) => `<button data-act="viewby" data-v="${v}" aria-pressed="${S.view === v}">${v[0].toUpperCase() + v.slice(1)}</button>`).join("")}</div><a class="btn primary" href="#new">+ File a claim</a></div>${body}
     <p class="foot">Simulated claims. Kierland Animal Clinic is a real Scottsdale clinic used as an example location; the insurer, owners, pets, claims and network status are fictional.</p>`;
@@ -587,7 +652,7 @@ function viewNew(arg) {
   const pet = petOf(d.pet);
   const opt = (arr, cur) => arr.map(([v, l]) => `<option value="${v}" ${v === cur ? "selected" : ""}>${h(l)}</option>`).join("");
   return `<div class="pagehead"><div class="t"><div class="eyebrow">Step 2 of 3 · Upload and read</div><h1>${d.addTo ? "Add a SOAP note to claim " + d.addTo : "New claim: upload the SOAP note and the estimate or invoice"}</h1></div>
-    <div class="row"><span class="small muted">Try a sample:</span><button class="btn small" data-act="sample" data-s="0">Juniper, ear</button><button class="btn small" data-act="sample" data-s="1">Miso, urinary (paid)</button><button class="btn small" data-act="sample" data-s="2">Bruno, knee (estimate)</button><button class="btn small" data-act="sample" data-s="3">Tofu, eye (clean claim)</button></div></div>
+    <div class="row"><span class="small muted">Try a sample:</span><button class="btn small" data-act="sample" data-s="0">Juniper, ear</button><button class="btn small" data-act="sample" data-s="1">Miso, urinary (paid)</button><button class="btn small" data-act="sample" data-s="2">Bruno, knee (estimate)</button><button class="btn small" data-act="sample" data-s="3">Tofu, eye (clean claim)</button><button class="btn small" data-act="sample" data-s="4">Lola, chocolate (emergency)</button></div></div>
   <div class="grid3">
     <div class="card"><div class="eyebrow">Claim details</div>
       <label class="f" for="fPet">Owner and animal</label><select id="fPet" data-bind="pet">${opt(S.pets.map((p) => [p.id, ownerOf(p.owner).name + " · " + p.name + " (" + p.species + ")"]), d.pet)}</select>
@@ -607,7 +672,8 @@ function viewNew(arg) {
       <label class="f" for="tInv">Lines the agents will read</label><textarea id="tInv" data-bind="invoice" placeholder="Exam, sick visit 1 68.00&#10;Total 68.00">${h(d.invoice)}</textarea>
       <p class="small muted" style="margin:.3rem 0 0">${d.docType === "estimate" ? "Estimate: checked now, filed after treatment with the final invoice." : d.paid ? "Already paid: reimbursement would go to the owner." : "Not yet paid: in-network clinics can be paid directly."}</p></div>
   </div>
-  <div class="card" style="margin-top:.8rem"><div class="row"><div style="flex:1"><div class="eyebrow ai">Agents, in order</div><div class="small muted">1 Extract facts · 2 Match candidate codes · 3 Validate · 4 Check insurer requirements · 5 Route · 6 Produce the claim packet</div></div>
+  <div class="card" style="margin-top:.8rem"><div class="row"><div style="flex:1"><div class="eyebrow ai">Agents, in order</div><div class="small muted">1 Extract facts · 2 Match candidate codes · 3 Validate · 4 Check insurer requirements · 5 Route · 6 Produce the claim packet. The Emergency agent reads everything first and puts emergencies ahead of the queue.</div></div>
+  <label class="small" style="display:inline-flex;gap:.4rem;align-items:center;font-weight:700"><input type="checkbox" data-act="emergdraft" ${d.emergency ? "checked" : ""}> Emergency visit</label>
   <button class="btn ai" data-act="runagents" ${S.master ? "" : "disabled"}>${S.master ? "Run agents" : "Agents are off"}</button></div><div id="runOut" style="margin-top:.6rem"></div></div>`;
 }
 
@@ -616,10 +682,10 @@ function viewReview(id) {
   return `<div class="pagehead"><div class="t"><div class="eyebrow">Step 3 of 3 · Claim review · Claim ${c.id} · filed ${dt(c.filed)} · visit ${dshort(c.visit)}</div><h1>${h(p.name)}, ${p.age}-year-old ${h(p.breed)} · ${h((c.result.codes.find((x) => x.status === "confirmed") || c.result.codes[0] || { term: "no confirmed diagnosis" }).term.toLowerCase())}</h1>
     <div class="row small muted" style="margin-top:.2rem">${h(cl.name)}, ${h(cl.city)} · Attending veterinarian: as signed on the SOAP note · Owner: ${h(o.name)} · Policy ${h(o.policy)} ${networkPill(c)} ${statusPill(c)}</div></div>
     <div class="row"><label class="small muted" for="pick">Claim</label><select id="pick" data-act="pick" style="width:auto">${S.claims.map((x) => `<option value="${x.id}" ${x.id === c.id ? "selected" : ""}>${x.id} · ${h(petOf(x.pet).name)} · ${h(x.status)}</option>`).join("")}</select></div></div>
-  ${growCard(c)}
+  ${emergCard(c)}${growCard(c)}
   ${stepper(c)}
   <div class="card" style="margin-top:.8rem"><div class="charthead"><div class="eyebrow ai">Agent run timeline · claim ${c.id}</div><span class="small muted">${(c.result.totalMs / 1000).toFixed(1)} s from upload to packet</span><button class="btn small" data-act="replay">▶ Replay the run</button></div>
-    <div class="d3wrap" id="chGantt"></div>${CC_CHARTS.legend([["Agent step passed", CC_CHARTS.C.ai], ...(ganttRows(c).some((d) => d.warn) ? [["Flagged for a person", CC_CHARTS.C.warn]] : []), ...(c.decision && c.decision.by === "Approval agent" ? [["Approved by the Approval agent", CC_CHARTS.C.good]] : [])])}
+    <div class="d3wrap" id="chGantt"></div>${CC_CHARTS.legend([...(isEmerg(c) ? [["Emergency agent, first", "var(--crit)"]] : []), ["Agent step passed", CC_CHARTS.C.ai], ...(ganttRows(c).some((d) => d.warn) ? [["Flagged for a person", CC_CHARTS.C.warn]] : []), ...(c.decision && c.decision.by === "Approval agent" ? [["Approved by the Approval agent", CC_CHARTS.C.good]] : [])])}
     ${CC_CHARTS.table(["Step", "Agents", "Started", "Took"], ganttRows(c).map((d) => [d.label, d.agents, "+" + Math.round(d.start) + " ms", Math.round(d.ms) + " ms"]))}</div>
   <div class="grid3" style="margin-top:.8rem">
     <div class="stack">${soapCard(c)}${timeline(c)}<div class="card">${deductible(p)}</div></div>
@@ -666,8 +732,12 @@ function viewAgents() {
     <label class="small muted" for="ceil">Limit</label><select id="ceil" data-act="ceiling" style="width:auto">${[250, 500, 1000, 2500].map((v) => `<option value="${v}" ${v === S.ceiling ? "selected" : ""}>${money(v)}</option>`).join("")}</select>
     <button class="btn ${S.autoApprove ? "" : "primary"}" data-act="autoapprove">${S.autoApprove ? "Turn off" : "Turn on"}</button></div>
     <p class="small" style="margin:.5rem 0 0">This session: ${S.claims.filter((c) => c.decision && c.decision.by === "Approval agent").length} approved by the agent · ${S.corrections.filter((x) => /undid the Approval agent/.test(x.text)).length} undone by a person.</p></div>
+  <div class="card emergcard" style="margin-top:.8rem"><div class="row"><div style="flex:1;min-width:16rem"><div class="eyebrow" style="color:var(--crit)">Emergency agent</div><h2 style="margin-top:.15rem">${AG["Emergency agent"].paused || !S.master ? "Paused: emergencies wait in the normal order" : "Emergencies jump the queue and run on a fast lane"}</h2>
+    <p class="small muted" style="margin:.25rem 0 0">It reads every note, invoice and clinic before the other agents. Signs like poisoning, trauma, trouble breathing, collapse, seizure, bloat, urinary blockage, heavy bleeding, hospitalization or an emergency clinic flag the claim. A flagged claim is coded first, each step runs about 2.5 times faster, and it goes to the front of a person's queue. A person can flag or unflag any claim. It never approves, pays or denies.</p></div>
+    <div class="stat"><small>Emergencies first</small><b>${S.ops.emerg}</b></div><div class="stat"><small>Median emergency</small><b>${(median(S.ops.emergMs) / 1000).toFixed(1)} s</b></div><div class="stat"><small>Median routine</small><b>${(median(S.ops.durations.filter((x) => x > 2000)) / 1000).toFixed(1)} s</b></div>
+    <button class="btn" data-act="pause" data-a="Emergency agent">${AG["Emergency agent"].paused ? "Resume" : "Pause"}</button></div></div>
   <div class="card" style="margin-top:.8rem"><div class="charthead"><div class="eyebrow ai">Live agent flow · every claim moves through the steps as it is coded</div><span class="small muted">A new queued claim about every 6 s</span></div>
-    <div class="d3wrap" id="chFlow"></div>${CC_CHARTS.legend([["Claim being coded", CC_CHARTS.C.ai], ["Approved by the Approval agent", CC_CHARTS.C.good], ["Handed to a person", CC_CHARTS.C.warn]])}</div>
+    <div class="d3wrap" id="chFlow"></div>${CC_CHARTS.legend([["Claim being coded", CC_CHARTS.C.ai], ["Approved by the Approval agent", CC_CHARTS.C.good], ["Handed to a person", CC_CHARTS.C.warn]])}<div class="small muted" style="margin-top:.2rem">A dot with a red ring is an emergency: it moves about 2.5 times faster and leaves at Route for the front of a person's queue.</div></div>
   <div class="grid2" style="margin-top:.8rem"><div class="card"><div class="charthead"><div class="eyebrow">Time to code · last 30 claims</div><span class="small muted">seconds, newest on the right</span></div><div class="d3wrap" id="chStream"></div><div id="chStreamLegend"></div>
     <details class="d3table" id="chStreamTable"><summary>Show as a table</summary></details></div>
   <div class="card"><div class="charthead"><div class="eyebrow">Error rate by agent</div><span class="small muted">60-day baseline plus this session</span></div><div class="d3wrap" id="chErrors"></div><div id="chErrorsLegend"></div>
@@ -675,7 +745,7 @@ function viewAgents() {
   <div class="card" style="margin-top:.8rem"><div class="eyebrow">Agent operations · 60-day baseline plus this session</div><div class="scroll"><table><thead><tr><th>Agent</th><th>Status</th><th>Uptime</th><th>Runtime</th><th>Downtime</th><th>Tasks</th><th>Error rate</th><th>Accuracy</th><th>p95</th><th></th></tr></thead><tbody id="agTable"></tbody></table></div>
   <p class="small muted" style="margin:.4rem 0 0">Uptime = runtime ÷ (runtime + downtime). Errors = failed, timed-out or rejected outputs ÷ tasks. A warning appears over 5%; the panel never pauses an agent on its own. The 60-day baseline is simulated; this session's counts are real.</p></div>
   <div class="grid2" style="margin-top:.8rem"><div class="card"><div class="eyebrow">Agent messages</div><div class="log" id="agLog"></div></div>
-  <div class="card"><div class="eyebrow">Execution order</div><ol class="small" style="margin:.3rem 0 0;padding-left:1.1rem"><li><b>Extract facts</b> from notes and invoice lines (Reader, Privacy guard, Fact extractor)</li><li><b>Match</b> facts to candidate codes (Diagnosis matcher, Invoice coder)</li><li><b>Validate</b> each code against its definition and the original text (Validator, Code reviewer)</li><li><b>Check</b> the insurer's document requirements (Requirements agent, History agent)</li><li><b>Route</b> ambiguous or conflicting cases for review (Router)</li><li><b>Produce</b> the claim packet with an evidence trail (Packet agent)</li><li><b>Approve</b> clean claims under the limit (Approval agent); everything else waits for a person</li></ol>
+  <div class="card"><div class="eyebrow">Execution order</div><p class="small" style="margin:.3rem 0 0"><b>First:</b> the Emergency agent reads every claim and moves emergencies to the front, on a fast lane.</p><ol class="small" style="margin:.3rem 0 0;padding-left:1.1rem"><li><b>Extract facts</b> from notes and invoice lines (Reader, Privacy guard, Fact extractor)</li><li><b>Match</b> facts to candidate codes (Diagnosis matcher, Invoice coder)</li><li><b>Validate</b> each code against its definition and the original text (Validator, Code reviewer)</li><li><b>Check</b> the insurer's document requirements (Requirements agent, History agent)</li><li><b>Route</b> ambiguous or conflicting cases for review (Router)</li><li><b>Produce</b> the claim packet with an evidence trail (Packet agent)</li><li><b>Approve</b> clean claims under the limit (Approval agent); everything else waits for a person</li></ol>
   <p class="small muted">For every proposed code the agents keep the supporting text, document and page, coding-system version, and whether the finding is confirmed or suspected.</p></div></div>`;
 }
 
@@ -714,17 +784,18 @@ function systemRows(claims) {
 }
 function ganttRows(c) {
   const r = c.result; const lab = ["1 Extract facts", "2 Match codes", "3 Validate", "4 Requirements", "5 Route", "6 Claim packet"]; let t = 0;
-  const rows = r.steps.map((s, i) => { const warn = (i === 2 && r.codes.some((x) => !x.review.agree || !x.validation.supported)) || (i === 3 && (r.history.flags.length || r.requirements.some((q) => q.required && !q.ok))) || (i === 4 && r.routing.toPerson);
-    const row = { label: lab[i], agents: s.agents.join(", "), start: t, ms: Math.max(1, s.ms), warn: !!warn, kind: "agent" }; t += s.ms; return row; });
+  const pre = []; if (isEmerg(c)) { pre.push({ label: "E Emergency", agents: "Emergency agent", start: 0, ms: c.emergency.ms, warn: false, kind: "emergency" }); t = c.emergency.ms; }
+  const rows = pre.concat(r.steps.map((s, i) => { const warn = (i === 2 && r.codes.some((x) => !x.review.agree || !x.validation.supported)) || (i === 3 && (r.history.flags.length || r.requirements.some((q) => q.required && !q.ok))) || (i === 4 && r.routing.toPerson);
+    const row = { label: lab[i], agents: s.agents.join(", "), start: t, ms: Math.max(1, s.ms), warn: !!warn, kind: "agent" }; t += s.ms; return row; }));
   if (c.decision && c.decision.by === "Approval agent") rows.push({ label: "7 Approve", agents: "Approval agent", start: t, ms: 300, warn: false, kind: "approve" });
   return rows;
 }
 function errorRows() { return Object.values(AG).map((a) => ({ name: a.name, security: a.security, rate: a.errors / Math.max(1, a.tasks), errors: a.errors, tasks: a.tasks, up: a.run / (a.run + a.down) })); }
 function streamTable() { const el = $("#chStreamTable"); if (!el) return; const lab = { auto: "Approved by the Approval agent", ready: "Ready, waiting for a person's OK", person: "Handed to a person" };
   el.innerHTML = `<summary>Show as a table</summary><div class="scroll"><table><thead><tr><th>Claim</th><th>Seconds to code</th><th>Outcome</th></tr></thead><tbody>${S.ops.recent.slice(-30).reverse().map((d) => `<tr><td class="mono">${h(d.label)}</td><td class="mono">${(d.ms / 1000).toFixed(1)}</td><td>${lab[d.outcome]}</td></tr>`).join("")}</tbody></table></div>`; }
-function liveCharts(outcome) {
+function liveCharts(outcome, emergency) {
   if (!location.hash.startsWith("#agents")) return;
-  if (CH.flow) { CH.flow.pulse(outcome); setTimeout(() => CH.flow && CH.flow.setCounts({ auto: S.ops.auto, person: S.ops.handed }), S.reduce ? 0 : 2600); }
+  if (CH.flow) { CH.flow.pulse(outcome, emergency); setTimeout(() => CH.flow && CH.flow.setCounts({ auto: S.ops.auto, person: S.ops.handed }), S.reduce ? 0 : 2600); }
   if (CH.stream) CH.stream.update(S.ops.recent);
   if (!$("#chStreamTable[open]")) streamTable();
 }
@@ -807,6 +878,8 @@ const SAMPLES = [
   { pet: "p6", clinic: "kierland", visit: "2026-10-22", docType: "invoice", paid: false, noteFile: "tofu-eye.pdf", invoiceFile: "invoice-tofu.pdf",
     note: "Patient: Tofu, feline, Maine Coon, 2 y\nDate of visit: 10/22/2026\nS: Squinting and tearing from the right eye since yesterday.\nO: Right eye: blepharospasm, epiphora. Fluorescein stain positive, small central corneal defect. Left eye normal.\nA: Corneal ulcer, right eye.\nP: Antibiotic eye drops three times daily for 7 days, e-collar, recheck in 5 days.",
     invoice: "Exam, sick visit 1 68.00\nFluorescein stain 1 32.00\nAntibiotic eye drops 1 41.50\nE-collar 1 18.00\nTotal 159.50" },
+  { pet: "p5", clinic: "afterhours", visit: "2026-10-22", docType: "invoice", paid: true, noteFile: "lola-er.pdf", invoiceFile: "invoice-lola-er.pdf",
+    note: D.VISITS.find((v) => v.claim === "4862").note, invoice: D.VISITS.find((v) => v.claim === "4862").invoice },
 ];
 async function runAgents() {
   const d = S.draft; if (!S.master) return;
@@ -815,12 +888,12 @@ async function runAgents() {
   if (paused.length) { out.innerHTML = `<div class="banner warn small">Paused: ${paused.map(h).join(", ")}. Resume them on the Agents screen to run the pipeline.</div>`; return; }
   const now = new Date().toISOString(); let c;
   if (d.addTo) { c = claimOf(d.addTo); c.notes.push({ text: d.note, file: d.noteFile || "pasted-note.txt", pages: d.notePages || 1, added: now }); c.decision = null; }
-  else { const id = String(4900 + S.claims.length); c = { id, pet: d.pet, clinic: d.clinic, visit: d.visit, filed: now, paid: d.paid, docType: d.docType, insurer: d.insurer, notes: [{ text: d.note, file: d.noteFile || "pasted-note.txt", pages: d.notePages || 1, added: now }], invoiceText: d.invoice, invoiceFile: d.invoiceFile || "pasted-lines.txt", invoicePages: d.invoicePages || 1, decision: null, events: [] }; if (d.ocrConf) c.ocr = d.ocrConf; }
+  else { const id = String(4900 + S.claims.length); c = { id, pet: d.pet, clinic: d.clinic, visit: d.visit, filed: now, paid: d.paid, docType: d.docType, insurer: d.insurer, emergencyFlag: d.emergency ? true : undefined, notes: [{ text: d.note, file: d.noteFile || "pasted-note.txt", pages: d.notePages || 1, added: now }], invoiceText: d.invoice, invoiceFile: d.invoiceFile || "pasted-lines.txt", invoicePages: d.invoicePages || 1, decision: null, events: [] }; if (d.ocrConf) c.ocr = d.ocrConf; }
   c.filed = d.addTo ? c.filed : now;
   const r = code(c, { extraMs: { 1: d.ocrConf ? 0 : 0 } });
   if (!d.addTo) S.claims.push(c);
   S.ops.coded++; S.ops.tasks++; S.ops.durations.push(r.totalMs); if (r.routing.toPerson) S.ops.handed++; if (c.decision && c.decision.by === "Approval agent") S.ops.auto++;
-  recent(outcomeOf(c), r.totalMs, c.id);
+  recent(outcomeOf(c), r.totalMs, c.id); if (isEmerg(c)) { S.ops.recent[S.ops.recent.length - 1].emergency = true; S.ops.emerg++; S.ops.emergMs.push(r.totalMs); log("Emergency agent", "Claim " + c.id + " flagged as an emergency (" + c.emergency.reasons.join(", ") + "); reviewed first.", "crit"); }
   const lab = ["Extract facts", "Match codes", "Validate", "Insurer requirements", "Route", "Claim packet"];
   for (let i = 0; i < r.steps.length; i++) {
     out.innerHTML = `<div class="stepper">${r.steps.map((s, j) => `<div class="step ${j < i ? "done" : j === i ? "running" : ""}"><span class="n">${j < i ? "✓" : s.n}</span><div><b>${s.n} ${lab[j]}</b><span class="mono">${j < i ? tm(s.at) : j === i ? "running" : "waiting"}</span><small>${j < i ? h(s.result) : h(s.agents.join(", "))}</small></div></div>`).join("")}</div>`;
@@ -873,12 +946,15 @@ document.addEventListener("click", (e) => {
   else if (a === "pause") { const g = AG[t.dataset.a]; g.paused = !g.paused; log(g.name, g.paused ? "Paused by a person." : "Resumed by a person.", g.paused ? "warn" : "good"); renderAgentsTable(); renderLive(); }
   else if (a === "autoapprove") { S.autoApprove = !S.autoApprove; log("Approval agent", S.autoApprove ? "Turned on by a person (limit " + money(S.ceiling) + ")." : "Turned off by a person. Every claim waits for a person.", S.autoApprove ? "good" : "warn"); route(); }
   else if (a === "reeval") { S.eval = A.evaluate(); route(); say("Accuracy recomputed"); }
-  else if (a === "sample") { const s = SAMPLES[+t.dataset.s]; Object.assign(S.draft, JSON.parse(JSON.stringify(s)), { ocrNote: "sample text", ocrInv: "sample text", ocrConf: null, addTo: null }); route(); }
+  else if (a === "sample") { const s = SAMPLES[+t.dataset.s]; Object.assign(S.draft, { emergency: false }, JSON.parse(JSON.stringify(s)), { ocrNote: "sample text", ocrInv: "sample text", ocrConf: null, addTo: null }); route(); }
   else if (a === "doctype") { const v = t.dataset.v; S.draft.docType = v === "estimate" ? "estimate" : "invoice"; S.draft.paid = v === "paid"; route(); }
   else if (a === "runagents") runAgents();
   else if (a === "download") { const c = claimOf(S.claim); const blob = new Blob([JSON.stringify(c.result.packet, null, 2)], { type: "application/json" }); const u = URL.createObjectURL(blob); const l = document.createElement("a"); l.href = u; l.download = "claim-" + c.id + "-packet.json"; l.click(); setTimeout(() => URL.revokeObjectURL(u), 1000); }
   else if (a === "print") window.print();
   else if (a === "replay") { if (CH.gantt) CH.gantt.play(); }
+  else if (a === "emergflag") { const c = claimOf(t.dataset.id); const off = !!t.dataset.off; c.emergencyFlag = off ? false : true; const keep = c.decision; c.decision = keep && keep.by === "Approval agent" ? null : keep; if (!c.decision) c.status = ""; code(c, { sim: true, noAuto: !!c.decision });
+    S.corrections.push({ claim: c.id, at: new Date().toISOString(), text: (off ? "A person removed the emergency flag" : "A person flagged the claim as an emergency") + " (labeled example)" });
+    log(off ? "You" : "Emergency agent", off ? "Claim " + c.id + ": emergency flag removed; back in the normal order." : "Claim " + c.id + " flagged as an emergency by a person; reviewed first and moved to the front of the queue.", off ? "info" : "crit"); route(); }
   else if (a === "humanreview") { const c = claimOf(t.dataset.id || S.claim); const at = new Date().toISOString(); const from = c.decision && c.decision.by === "Approval agent" ? "Approval agent's" : null;
     S.undo.push({ claim: c.id, decision: c.decision, status: c.status, review: null }); c.review = { state: "open", at, by: "You", from }; c.decision = null; c.status = "In human review";
     S.corrections.push({ claim: c.id, at, text: "Sent to human review" + (from ? " (Approval agent's approval set aside)" : "") + " (labeled example)" });
@@ -900,6 +976,7 @@ document.addEventListener("change", (e) => {
   const t = e.target;
   if (t.dataset.act === "ceiling") { S.ceiling = +t.value; log("Approval agent", "Limit set to " + money(S.ceiling) + " by a person.", "info"); route(); }
   if (t.dataset.act === "pick") location.hash = "#review/" + t.value;
+  if (t.dataset.act === "emergdraft" && S.draft) S.draft.emergency = t.checked;
   if (t.dataset.act === "editcode") editCode(t.dataset.code, t.value);
   if (t.dataset.act === "insurer") { const c = claimOf(S.claim); c.insurer = t.value; code(c, { sim: true }); log("Requirements agent", "Claim " + c.id + " re-checked against " + D.INSURERS[t.value].name, "info"); route(); }
   if (t.dataset.bind && S.draft) { S.draft[t.dataset.bind] = t.value; if (t.dataset.bind === "pet" || t.dataset.bind === "clinic" || t.dataset.bind === "insurer") route(); }
@@ -913,7 +990,7 @@ window.addEventListener("hashchange", route);
 
 // ---------- agent API (AXO) ----------
 window.ClaimsCoder = {
-  state: () => ({ master: S.master, claims: S.claims.map((c) => ({ id: c.id, pet: petOf(c.pet).name, status: c.status, codes: c.result.codes.map((x) => x.term + " (" + x.status + ")") })) }),
+  state: () => ({ master: S.master, claims: S.claims.map((c) => ({ id: c.id, pet: petOf(c.pet).name, status: c.status, emergency: isEmerg(c) ? c.emergency.reasons : false, codes: c.result.codes.map((x) => x.term + " (" + x.status + ")") })) }),
   claim: (id) => { const c = claimOf(id); return c ? c.result.packet : null; },
   codes: { search: (text) => A.search(text) },
   submit: (o) => { if (!S.master) return { status: "error", reason: "Master shutoff is off" }; S.draft = Object.assign({ pet: "p1", clinic: "kierland", visit: new Date().toISOString().slice(0, 10), docType: "invoice", paid: false, insurer: "northpaw", note: "", invoice: "", addTo: null }, o); runAgents(); return { status: "running" }; },

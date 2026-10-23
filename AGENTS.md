@@ -13,7 +13,7 @@ Instructions for AI coding agents working in this repo.
 
 ## Agent order
 
-1 Extract facts (Reader, Privacy guard, Fact extractor) · 2 Match candidate codes (Diagnosis matcher, Invoice coder) · 3 Validate (Validator, Code reviewer) · 4 Check insurer requirements (Requirements agent, History agent) · 5 Route (Router) · 6 Produce the claim packet (Packet agent) · 7 Approve clean claims under the limit (Approval agent). Security agents (Bot defense, Account security, API integrity, Data access audit, Warning agent) always run.
+First, the Emergency agent reads every claim and moves emergencies to the front on a fast lane (it never approves, pays or denies). Then: 1 Extract facts (Reader, Privacy guard, Fact extractor) · 2 Match candidate codes (Diagnosis matcher, Invoice coder) · 3 Validate (Validator, Code reviewer) · 4 Check insurer requirements (Requirements agent, History agent) · 5 Route (Router) · 6 Produce the claim packet (Packet agent) · 7 Approve clean claims under the limit (Approval agent). Security agents (Bot defense, Account security, API integrity, Data access audit, Warning agent) always run.
 
 Every proposed code keeps its supporting text, document and page, coding-system version, and confirmed or suspected status.
 
@@ -32,10 +32,10 @@ Every proposed code keeps its supporting text, document and page, coding-system 
 
 | Call | What it does |
 |---|---|
-| `state()` | Master shutoff state and every claim with its status and codes |
+| `state()` | Master shutoff state and every claim with its status, codes and emergency reasons |
 | `claim(id)` | The claim packet as JSON |
 | `codes.search(text)` | Candidate codes for a phrase, with confirmed or suspected status |
-| `submit({ pet, clinic, visit, docType, paid, insurer, note, invoice })` | Runs the six agent steps on a new claim |
+| `submit({ pet, clinic, visit, docType, paid, insurer, note, invoice, emergency })` | Runs the six agent steps on a new claim |
 | `approve(id)` | Returns `waiting-for-ok`; outside agents cannot approve |
 | `master(false)` / `stop()` | Turns all working agents off |
 | `health()` | Uptime, tasks, error rate and p95 per agent |
