@@ -242,10 +242,11 @@ svg.d3c .ghead.live .ring { animation: gpulse 1.6s ease-out infinite; transform-
 <div class="sr" aria-live="polite" id="say"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="data.js"></script>
-<script src="dataset.js"></script>
-<script src="charts.js"></script>
-<script src="agents.js"></script>
+<script>window.d3 || document.write('<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"><\/script>');</script>
+<script src="data.js?v=10"></script>
+<script src="dataset.js?v=10"></script>
+<script src="charts.js?v=10"></script>
+<script src="agents.js?v=10"></script>
 <script>
 (function () {
 "use strict";
