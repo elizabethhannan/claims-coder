@@ -8,7 +8,7 @@ Agents read a vet's SOAP note and the estimate or invoice, assign diagnosis code
 
 | Scope | Baseline | Target | Result | Not achieved |
 |---|---|---|---|---|
-| Vet SOAP notes and invoices to a traceable claim packet; 16 agents (11 working, 5 always-on security) | Most veterinary record systems have no clinical coding built in (Boguslav et al., 2026) | Every code traceable to its text, page, coding-system version and status; complete packet | 30 of 30 notes coded exactly on a test set written alongside the agents | No real clinic records tested; no real insurer decisions; reimbursement not predicted |
+| Vet SOAP notes and invoices to a traceable claim packet; 17 agents (12 working, 5 always-on security) | Most veterinary record systems have no clinical coding built in (Boguslav et al., 2026) | Every code traceable to its text, page, coding-system version and status; complete packet | 30 of 30 notes coded exactly on a test set written alongside the agents | No real clinic records tested; no real insurer decisions; reimbursement not predicted |
 
 ## The challenge
 
@@ -23,7 +23,9 @@ Insured pets reached a record 7.03 million in North America at year-end 2024, up
 3. **Agents, in order:** extract facts; match candidate codes; validate each code against its definition and the original text; check the insurer's document requirements; route ambiguous or conflicting cases to a person; produce the claim packet with an evidence trail.
 4. **Claim review:** a step bar with timestamps, the SOAP note with each code's supporting text highlighted, rule-outs held back as suspected, the pre-existing condition time frame, a deductible reminder, invoice lines mapped to benefit categories, and a hand-back card when the agents are unsure.
 5. **Claim packet:** claim form, documents, codes with evidence trail, itemized lines, requirements and audit trail; download as JSON or print to PDF.
-6. **Agents:** a master shutoff, per-agent pause, Stop all (Esc), and live runtime, downtime, uptime, error rate, accuracy and p95 time for every agent.
+6. **Approval agent:** approves a claim packet as ready to submit only when all six agent steps passed, every code is confirmed, supported and agreed, every required document is present, there is no pre-existing or waiting-period flag, and the total is at or under a limit a person sets ($500 by default). It never denies, never pays and never acts on an estimate. A person can turn it off, change the limit, or undo any approval; each undo is logged as a labeled example.
+7. **Agents:** a master shutoff, per-agent pause, Stop all (Esc), and live runtime, downtime, uptime, error rate, accuracy and p95 time for every agent.
+8. **Overview:** a landing page built from the Figma cover. Light and dark mode button in the top bar.
 
 For every proposed code the agents keep the supporting text, document and page, coding-system version, and whether the finding is confirmed or suspected.
 
@@ -33,8 +35,8 @@ For every proposed code the agents keep the supporting text, document and page, 
 2. Small Animal Problem and Diagnosis Terms (SA-PDT), a SNOMED CT and VetSCT subset from VTS at Virginia Tech. The app uses a sample of term names; IDs are placeholders (SIM-) until the release is downloaded with a VTS or UMLS account and its terms of use are confirmed.
 3. The Veterinary Extension to SNOMED CT (VetSCT), when SA-PDT lacks a concept.
 4. VeNom, for procedures and presenting complaints; mappings to SNOMED need validation.
-5. VetTag, evaluated only against a manually checked sample (Zhang et al., 2019).
-6. Public claims CSVs, for amounts and timing only.
+5. VetTag, evaluated only against a manually checked sample (Zhang et al., 2019). The released code does not include the labeled notes.
+6. Public claims CSVs, for amounts and timing only. The predicting-claims data holds 210,235 claims (2018 to 2020) for 50,000 pets: median claim $199.03, median 166 days from enrollment to first claim. It has no clinical text, so it cannot validate coding (Hart, n.d.).
 7. Fetch's research data, a later partnership (O'Brien et al., 2024).
 
 First milestone: accurate, traceable coding and a complete claim packet. Predicting reimbursement comes after there are real insurer decisions to evaluate against.
@@ -55,7 +57,7 @@ Static site: `index.html` (interface), `agents.js` (the agents), `data.js` (voca
 
 ## Testing
 
-- **Done:** automated browser tests at laptop and phone width (every screen, no script errors, no horizontal scrolling); a full claim run from sample upload to approved packet; the API refuses to turn agents on, approve or submit.
+- **Done:** automated browser tests at laptop and phone width, light and dark (every screen, no script errors, no horizontal scrolling); a full claim run from sample upload to a packet approved by the Approval agent; a flagged claim handed to a person instead; the API refuses to turn agents on or approve.
 - **Coding accuracy:** precision 1.00, recall 1.00, exact match 30 of 30 on a test set written alongside the agents. This shows the agents work as designed; it is not evidence of accuracy on real records.
 - **Planned:** a manually checked sample of real, consented SOAP notes; a usability test with 5 claims reviewers measuring task completion and the Single Ease Question.
 
@@ -71,13 +73,15 @@ North American Pet Health Insurance Association. (2025, April 22). *North Americ
 
 O'Brien, J., McCullough, A., Debes, C., & Ruple, A. (2024). *Using pet insurance claims to predict occurrence of vector-borne and zoonotic disease in humans* [Preprint]. medRxiv. https://doi.org/10.1101/2024.08.09.24311752
 
+Hart, S. R. (n.d.). *predicting-claims* [Data set]. GitHub. Retrieved October 23, 2026, from https://github.com/stevenrhart/predicting-claims/tree/main/data
+
 Pumpkin. (n.d.-a). *Claims*. Retrieved October 22, 2026, from https://www.pumpkin.care/claims
 
 Pumpkin. (n.d.-b). *FAQs*. Retrieved October 22, 2026, from https://www.pumpkin.care/faqs
 
 Virginia-Maryland College of Veterinary Medicine, Veterinary Terminology Services. (2026). *Small Animal Problem and Diagnosis Terms*. https://vtsl.vetmed.vt.edu/sa
 
-Zhang, Y., et al. (2019). *VetTag: Improving automated veterinary diagnosis coding via large-scale language modeling* [Abstract record]. OmicsDI. https://www.omicsdi.org/dataset/biostudies-literature/S-EPMC6550141
+Zhang, Y., et al. (2019). VetTag: Improving automated veterinary diagnosis coding via large-scale language modeling. *npj Digital Medicine*. https://www.nature.com/articles/s41746-019-0113-1
 
 ---
 

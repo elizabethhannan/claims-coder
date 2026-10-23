@@ -114,7 +114,7 @@
   }
 
   const CATS = [
-    ["Exam", /exam|consult|office visit|recheck/i], ["Diagnostics", /cytolog|radiograph|x-?ray|ultrasound|urinalysis|culture|cbc|chemistry|panel|test|fecal|blood ?work|biopsy|aspirate|t4|echo/i],
+    ["Exam", /exam|consult|office visit|recheck/i], ["Diagnostics", /cytolog|radiograph|x-?ray|ultrasound|urinalysis|culture|cbc|chemistry|panel|test|fecal|blood ?work|biopsy|aspirate|t4|echo|stain|fluorescein|tonometry|schirmer/i],
     ["Surgery", /surg|extraction|tplo|repair|suture|anesthe|sedation|spay|neuter|removal/i], ["Hospitalization", /hospital|overnight|iv fluid|icu|monitoring/i],
     ["Dental cleaning", /dental cleaning|polish|prophy/i], ["Wellness", /vaccin|wellness|heartworm prevent|flea prevent|microchip/i],
     ["Medication", /tablet|capsule|ointment|drops|injection|medication|mg\b|antibiotic|carprofen|gabapentin|maropitant|buprenorphine|amoxicillin|cerenia|pain/i],

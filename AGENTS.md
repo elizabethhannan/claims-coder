@@ -13,13 +13,14 @@ Instructions for AI coding agents working in this repo.
 
 ## Agent order
 
-1 Extract facts (Reader, Privacy guard, Fact extractor) · 2 Match candidate codes (Diagnosis matcher, Invoice coder) · 3 Validate (Validator, Code reviewer) · 4 Check insurer requirements (Requirements agent, History agent) · 5 Route (Router) · 6 Produce the claim packet (Packet agent). Security agents (Bot defense, Account security, API integrity, Data access audit, Warning agent) always run.
+1 Extract facts (Reader, Privacy guard, Fact extractor) · 2 Match candidate codes (Diagnosis matcher, Invoice coder) · 3 Validate (Validator, Code reviewer) · 4 Check insurer requirements (Requirements agent, History agent) · 5 Route (Router) · 6 Produce the claim packet (Packet agent) · 7 Approve clean claims under the limit (Approval agent). Security agents (Bot defense, Account security, API integrity, Data access audit, Warning agent) always run.
 
 Every proposed code keeps its supporting text, document and page, coding-system version, and confirmed or suspected status.
 
 ## The contract (same for agents and people)
 
-- No agent approves, submits, pays or denies a claim. A person decides.
+- Only the in-app Approval agent approves, and only clean claims: all six steps passed, every code confirmed, supported and agreed, every required document present, no pre-existing or waiting-period flag, total at or under the limit a person sets. It never acts on estimates. A person can undo any approval or turn it off.
+- No agent submits, pays or denies a claim. Everything with an open question goes to a person.
 - A checking agent's disagreement goes to a person; neither agent overrules the other.
 - The master shutoff can be turned off through the API; turning it back on needs a person.
 - Stop all (Esc) halts every working agent; security agents keep running.
@@ -34,7 +35,7 @@ Every proposed code keeps its supporting text, document and page, coding-system 
 | `claim(id)` | The claim packet as JSON |
 | `codes.search(text)` | Candidate codes for a phrase, with confirmed or suspected status |
 | `submit({ pet, clinic, visit, docType, paid, insurer, note, invoice })` | Runs the six agent steps on a new claim |
-| `approve(id)` | Returns `waiting-for-ok`; a person approves in the app |
+| `approve(id)` | Returns `waiting-for-ok`; outside agents cannot approve |
 | `master(false)` / `stop()` | Turns all working agents off |
 | `health()` | Uptime, tasks, error rate and p95 per agent |
 | `agentLog()` / `evalReport()` | Agent messages; accuracy on the test set |
