@@ -345,7 +345,8 @@ function networkPill(c) { const cl = clinicOf(c.clinic); const ins = D.INSURERS[
 function statusPill(c) { const s = c.status || ""; const k = /Needs/.test(s) ? "warn" : /Submitted|Approved|approved|Ready/.test(s) ? "good" : /Records/.test(s) ? "accent" : /Estimate/.test(s) ? "ai" : "muted"; return `<span class="pill ${k}">${h(s)}</span>`; }
 
 function deductible(pet) { if (!pet) return ""; const left = Math.max(0, pet.deductible - pet.deductibleMet);
-  return `<div class="banner ${left > 0 ? "ai" : "good"} small"><b>Deductible reminder:</b> ${money(pet.deductibleMet)} of ${money(pet.deductible)} met this policy year · <b>${money(left)} left</b>. The insurer applies the deductible before any reimbursement.</div>`; }
+  const renew = (() => { const s = new Date(pet.coverageStart + "T12:00:00"), n = new Date(); const r = new Date(n.getFullYear(), s.getMonth(), s.getDate(), 12); if (r <= n) r.setFullYear(r.getFullYear() + 1); return r.toISOString().slice(0, 10); })();
+  return `<div class="banner ${left > 0 ? "ai" : "good"} small"><b>Deductible reminder:</b> yearly deductible of ${money(pet.deductible)}, ${money(pet.deductibleMet)} met this policy year · <b>${money(left)} left</b>. It resets on ${dshort(renew)}. The insurer applies it before any reimbursement. <b>Plan cap: unlimited</b> (no annual or lifetime payout limit).</div>`; }
 
 function timeline(c) {
   const pet = petOf(c.pet), ins = c.result.insurer, hst = c.result.history; if (!pet) return "";
@@ -454,7 +455,7 @@ function viewDesk() {
       <td>${conf.map((x) => h(x.term)).join(", ") || '<span class="muted">Suspected only</span>'}</td><td class="mono nw" style="text-align:right">${money(c.result.invoice.total)}</td><td>${statusPill(c)}</td></tr>${open ? notesPanel(c) : ""}`; }).join("")}</tbody></table></div>`;
   const animalCard = (p) => { const cl = S.claims.filter((c) => c.pet === p.id).sort((a, b) => b.visit.localeCompare(a.visit)); const left = Math.max(0, p.deductible - p.deductibleMet);
     return `<div class="card"><div class="row" style="align-items:flex-start"><div style="flex:1"><div class="eyebrow">Animal</div><h2 style="margin-top:.15rem">${h(p.name)} · ${h(p.species)}, ${p.age}, ${h(p.breed)}</h2>
-      <div class="small muted">Enrolled ${dshort(p.coverageStart)} · Plan B-2024 · illness wait ended ${dshort(A.addDays(p.coverageStart, 14))} · ${cl.length} claim${cl.length === 1 ? "" : "s"} · <span style="color:var(--${left ? "ai" : "good"})">Deductible reminder: ${money(left)} left of ${money(p.deductible)}</span></div></div>
+      <div class="small muted">Enrolled ${dshort(p.coverageStart)} · Plan B-2024 · illness wait ended ${dshort(A.addDays(p.coverageStart, 14))} · ${cl.length} claim${cl.length === 1 ? "" : "s"} · <span style="color:var(--${left ? "ai" : "good"})">Yearly deductible: ${money(left)} left of ${money(p.deductible)}</span> · Plan cap: unlimited</div></div>
       <a class="btn" href="#new/pet/${p.id}">+ New claim for ${h(p.name)}</a></div><div style="margin-top:.7rem">${cl.length ? claimTable(cl, false) : `<p class="small muted">No claims yet.</p>`}</div></div>`; };
   let body = "";
   if (S.view === "owner") {

@@ -70,7 +70,7 @@
       id: "northpaw", name: "Northpaw Mutual (fictional)", fictional: true,
       required: [["claimForm", "Claim form: pet, visit date, clinic, reason"], ["soapNote", "Medical record (SOAP note) for the visit"], ["itemizedInvoice", "Itemized invoice or estimate"], ["codes", "A diagnosis code for every billed condition"]],
       recommended: [["history", "Prior medical records for new pets"]],
-      waitingDays: 14, lookbackMonths: 12, curableFreeDays: 365, directPayNetwork: true,
+      waitingDays: 14, lookbackMonths: 12, curableFreeDays: 365, directPayNetwork: true, deductible: "yearly", planCap: "unlimited",
       preexistingRule: "Pre-existing if signs appear in the 12 months before coverage starts or during the 14-day illness wait. A curable condition free of signs and treatment for 365 days may be covered again.",
       source: null,
     },
