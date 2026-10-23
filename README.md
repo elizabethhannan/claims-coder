@@ -4,7 +4,20 @@ Agents read a vet's SOAP note and the estimate or invoice, assign diagnosis code
 
 **Live app:** https://elizabethhannan.github.io/claims-coder/
 **Designer and builder:** Elizabeth Hannan · 2026 · UI designed in Figma, built in code
-**Status:** Working prototype with simulated claims. The insurer profile "Northpaw Mutual", the owners, pets and claims are fictional. Kierland Animal Clinic is a real Scottsdale clinic used as an example location. Uploaded files are read only in your browser.
+**Status:** Portfolio rebuild of shipped client work. Client, data and details changed under NDA. Numbers are best-case scenario figures, not client data.
+
+## The client
+
+- **Client:** National pet insurance provider. Client name withheld under NDA.
+- **What shipped:** the interaction model shown here shipped for this client. This repo rebuilds it for the portfolio: names, data and details are changed, and the interface was redrawn in Figma.
+- **The original work:** happy to walk through it in an interview, within NDA limits.
+
+### The challenges we built it to solve
+
+1. **Claims waited on someone reading vet notes by hand.** Pet insurance has no shared billing code set, so every SOAP note and invoice was read and coded manually before a claim could move.
+2. **Adjusters couldn't see why a code was chosen.** Without the supporting text, every agent-coded claim had to be re-read, which erased the time saved.
+
+**Prototype data:** simulated claims. The insurer profile "Northpaw Mutual", the owners, pets and claims are fictional. Kierland Animal Clinic is a real Scottsdale clinic used as an example location. Uploaded files are read only in your browser.
 
 | Scope | Baseline | Target | Result | Not achieved |
 |---|---|---|---|---|

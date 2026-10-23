@@ -223,6 +223,15 @@ tr.emerg td:first-child { box-shadow: inset 4px 0 0 var(--crit); }
 .charthead { display: flex; flex-wrap: wrap; gap: .4rem .8rem; align-items: baseline; }
 .charthead .eyebrow { flex: 1; min-width: 12rem; }
 </style>
+<style id="clientband-css">
+.clientband{background:var(--surface);border-bottom:1px solid var(--line);color:var(--ink-2);font-size:.875rem;line-height:1.4}
+.clientband .cb{max-width:1280px;margin:0 auto;padding:8px 16px;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.clientband svg{width:34px;height:34px;flex:none}
+.clientband .who{display:flex;flex-direction:column;min-width:0;flex:1 1 220px}
+.clientband .who b{color:var(--ink);font-weight:600}
+.clientband .nda{margin-left:auto;font-size:.8125rem;color:var(--ink-3);max-width:60ch}
+@media (max-width:720px){.clientband .nda{margin-left:0}}
+</style>
 </head>
 <body>
 <a class="sr" href="#view">Skip to content</a>
@@ -245,6 +254,10 @@ tr.emerg td:first-child { box-shadow: inset 4px 0 0 var(--crit); }
       <button class="btn small" data-act="motion" aria-pressed="true">Motion on</button></div></details>
   </div>
 </header>
+<div class="clientband" role="note" aria-label="About the client">
+  <div class="cb"><svg viewBox="0 0 40 40" role="img" aria-label="Client mark"><rect width="40" height="40" rx="9" fill="#3e2f86"/><path d="M20 7 31 11v8c0 7-4.7 12-11 14-6.3-2-11-7-11-14v-8z" fill="#fff"/><g fill="#1f6f78"><ellipse cx="20" cy="23.2" rx="4.6" ry="3.8"/><circle cx="14.6" cy="17.8" r="1.9"/><circle cx="18" cy="15" r="1.9"/><circle cx="22" cy="15" r="1.9"/><circle cx="25.4" cy="17.8" r="1.9"/></g></svg><div class="who"><b>Client</b><span>National pet insurance provider</span></div><p class="nda" style="margin-block:0">Portfolio rebuild of shipped client work. Client, data and details changed under NDA. Numbers are best-case scenario figures, not client data.</p></div>
+</div>
+
 <div class="live" id="live" aria-label="Live operations"></div>
 <main id="view" tabindex="-1"></main>
 <div class="sr" aria-live="polite" id="say"></div>
