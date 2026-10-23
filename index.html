@@ -194,6 +194,18 @@ svg.d3c .cross { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 3; }
 svg.d3c .mk { stroke: var(--surface); stroke-width: 2; }
 svg.d3c .scan { stroke: var(--c-ai); stroke-width: 2; }
 svg.d3c .hit { fill: transparent; }
+svg.d3c .gtrack { fill: var(--muted); }
+svg.d3c .gsep { stroke: var(--surface); stroke-width: 2; } svg.d3c .gsep.last { display: none; }
+svg.d3c text.gl { font-size: 12px; fill: var(--ink-3); } svg.d3c text.gl.on { fill: var(--ink); font-weight: 700; }
+svg.d3c text.gtime { font-size: 11px; fill: var(--ink-2); font-family: "IBM Plex Mono", monospace; }
+svg.d3c .ghead circle:not(.ring) { stroke: var(--surface); stroke-width: 2; }
+svg.d3c .ghead .ring { fill: none; stroke-width: 2; opacity: 0; }
+svg.d3c .ghead.live .ring { animation: gpulse 1.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+.reduce svg.d3c .ghead.live .ring { animation: none; }
+@keyframes gpulse { 0% { opacity: .7; transform: scale(1); } 100% { opacity: 0; transform: scale(2.2); } }
+.mgrow { display: inline-block; width: 5rem; height: .55rem; border-radius: 99px; background: var(--muted); overflow: hidden; vertical-align: middle; }
+.mgrow i { display: block; height: 100%; border-radius: 99px; width: 0; }
+.growcard .row { align-items: center; }
 .d3legend { display: flex; flex-wrap: wrap; gap: .25rem 1rem; font-size: .62rem; color: var(--ink-2); margin-top: .35rem; }
 .d3legend span { display: inline-flex; align-items: center; gap: .35rem; }
 .sw { display: inline-block; width: .7rem; height: .7rem; border-radius: 3px; margin-right: .3rem; vertical-align: -1px; }
@@ -332,6 +344,18 @@ function p95(a) { const s = a.slice().sort((x, y) => x - y); return s.length ? s
 // Every coded claim is recorded once for the live charts: outcome, time to code and a label.
 function recent(outcome, ms, label) { S.ops.seq++; S.ops.recent.push({ id: S.ops.seq, outcome, ms, label }); if (S.ops.recent.length > 60) S.ops.recent.shift(); return outcome; }
 function outcomeOf(c) { return c.result.routing.toPerson ? "person" : c.decision && c.decision.by === "Approval agent" ? "auto" : "ready"; }
+// Where a claim is in the process: 8 stages, the last two belong to people (or the Approval agent).
+const STAGE_LABELS = ["Extract", "Match", "Validate", "Requirements", "Route", "Packet", "Approve", "Submitted"];
+function progressOf(c) {
+  const r = c.result, d = c.decision, rv = c.review;
+  const stages = STAGE_LABELS.map((label, i) => ({ label, time: i < 6 && r.steps[i] ? tm(r.steps[i].at) : "" , who: i < 6 && r.steps[i] ? r.steps[i].agents.join(", ") : "" }));
+  let done = 6, tone = r.routing.toPerson ? "warn" : "accent", now = r.routing.toPerson ? "Waiting for a person" : "Ready for an OK";
+  if (rv && rv.state === "open") { done = 6.5; tone = "ai"; now = "In human review"; stages[6].time = tm(rv.at); stages[6].who = "Human reviewer"; }
+  if (d && (d.kind === "approve" || d.kind === "auto" || d.kind === "approved")) { done = 7; tone = "good"; now = d.label || "Approved"; stages[6].time = tm(d.at); stages[6].who = d.by || "You"; }
+  else if (d) { done = 6.5; tone = "warn"; now = d.label; stages[6].time = tm(d.at); stages[6].who = d.by || "You"; }
+  if (/Submitted/.test(c.status)) { done = 8; tone = "good"; now = "Submitted to the insurer"; stages[7].time = d ? tm(d.at) : ""; }
+  return { done, tone, now, stages };
+}
 function working() { return AGENTS.filter((n) => !AG[n].paused && S.master).length; }
 function renderLive() {
   const o = S.ops, up = Object.values(AG).filter((a) => !a.security).reduce((a, b) => a + b.run, 0) / Object.values(AG).filter((a) => !a.security).reduce((a, b) => a + b.run + b.down, 0);
@@ -376,7 +400,7 @@ function stepper(c, live) {
     out.push(`<div class="step ${warn ? "warn" : "done"}"><span class="n">${warn ? "!" : "✓"}</span><div><b>${s.n} ${lab[i]}</b><span class="mono">${tm(s.at)} · ${s.ms < 1000 ? s.ms + " ms" : (s.ms / 1000).toFixed(1) + " s"}</span><small>${h(s.agents.join(", "))}</small></div></div>`);
   });
   const d = c.decision;
-  out.push(`<div class="step ${d ? "done" : "now"}"><span class="n">${d ? "✓" : "7"}</span><div><b>7 Approve</b><span class="mono">${d ? tm(d.at) : "waiting"}</span><small>${d ? h(d.by === "Approval agent" ? "Approval agent" : (d.by || "You") + ": " + (d.label || "Approved")) : r.routing.toPerson ? "Handed back to you" : "Ready for your OK"}</small></div></div>`);
+  out.push(`<div class="step ${d ? "done" : "now"}"><span class="n">${d ? "✓" : "7"}</span><div><b>7 Approve</b><span class="mono">${d ? tm(d.at) : "waiting"}</span><small>${d ? h(d.by === "Approval agent" ? "Approval agent" : (d.by || "You") + ": " + (d.label || "Approved")) : c.review && c.review.state === "open" ? "In human review" : r.routing.toPerson ? "Handed back to you" : "Ready for your OK"}</small></div></div>`);
   out.push(`<div class="step next"><span class="n">8</span><div><b>8 Submitted</b><span class="mono">${/Submitted/.test(c.status) ? "done" : "—"}</span><small>Packet to the insurer</small></div></div>`);
   return `<div class="stepper" role="list" aria-label="Claim steps">${out.join("")}</div>`;
 }
@@ -385,7 +409,7 @@ function networkPill(c) { const cl = clinicOf(c.clinic); const ins = D.INSURERS[
   if (!ins.directPayNetwork) return `<span class="pill muted">Network: not used by this insurer</span>`;
   return cl.inNetwork ? `<span class="pill good" title="Direct pay to the clinic is possible"><span class="dot"></span>In network</span>` : `<span class="pill warn" title="Owner pays and is reimbursed"><span class="dot"></span>Out of network</span>`; }
 
-function statusPill(c) { const s = c.status || ""; const k = /Needs/.test(s) ? "warn" : /Submitted|Approved|approved|Ready/.test(s) ? "good" : /Records/.test(s) ? "accent" : /Estimate/.test(s) ? "ai" : "muted"; return `<span class="pill ${k}">${h(s)}</span>`; }
+function statusPill(c) { const s = c.status || ""; const k = /Needs/.test(s) ? "warn" : /Submitted|Approved|approved|Ready/.test(s) ? "good" : /Records/.test(s) ? "accent" : /Estimate|review/.test(s) ? "ai" : "muted"; return `<span class="pill ${k}">${h(s)}</span>`; }
 
 function deductible(pet) { if (!pet) return ""; const left = Math.max(0, pet.deductible - pet.deductibleMet);
   const renew = (() => { const s = new Date(pet.coverageStart + "T12:00:00"), n = new Date(); const r = new Date(n.getFullYear(), s.getMonth(), s.getDate(), 12); if (r <= n) r.setFullYear(r.getFullYear() + 1); return r.toISOString().slice(0, 10); })();
@@ -467,15 +491,28 @@ function agentsCard(c) {
 
 function handback(c) {
   const r = c.result, d = c.decision;
-  if (d) return `<div class="card handback ready"><div class="eyebrow" style="color:var(--good)">${d.by === "Approval agent" ? "Approved by an agent" : "Decided"}</div><h3 style="margin:.2rem 0">${h(d.label || "Approved")}</h3><p class="small">${h(d.by || "You")} · ${dt(d.at)}</p>${d.rules ? `<ul class="small" style="margin:.2rem 0 .5rem;padding-left:1rem">${d.rules.map((x) => `<li>${h(x)}</li>`).join("")}</ul><p class="small muted" style="margin:0 0 .5rem">You can undo this. The Approval agent never denies or pays a claim.</p>` : ""}<div class="row noprint"><a class="btn primary" href="#packet/${c.id}">Open claim packet</a>${S.undo.some((u) => u.claim === c.id) ? `<button class="btn" data-act="undo" data-id="${c.id}">Undo</button>` : ""}</div></div>`;
+  if (d) return `<div class="card handback ready"><div class="eyebrow" style="color:var(--good)">${d.by === "Approval agent" ? "Approved by an agent" : "Decided"}</div><h3 style="margin:.2rem 0">${h(d.label || "Approved")}</h3><p class="small">${h(d.by || "You")} · ${dt(d.at)}</p>${d.rules ? `<ul class="small" style="margin:.2rem 0 .5rem;padding-left:1rem">${d.rules.map((x) => `<li>${h(x)}</li>`).join("")}</ul><p class="small muted" style="margin:0 0 .5rem">You can undo this. The Approval agent never denies or pays a claim.</p>` : ""}<div class="row noprint"><a class="btn primary" href="#packet/${c.id}">Open claim packet</a>${reviewButton(c)}${S.undo.some((u) => u.claim === c.id) ? `<button class="btn" data-act="undo" data-id="${c.id}">Undo</button>` : ""}</div></div>`;
+  if (c.review && c.review.state === "open") return `<div class="card handback"><div class="eyebrow ai">In human review</div><h3 style="margin:.2rem 0">A person is checking this claim before it is submitted</h3><p class="small">Requested by ${h(c.review.by)} · ${dt(c.review.at)}${c.review.from ? " · the " + h(c.review.from) + " approval was set aside" : ""}</p><p class="small muted">Nothing is submitted, paid or denied while the review is open.</p><div class="row noprint">${reviewButton(c)}<button class="btn" data-act="takeover">Take over</button>${S.undo.some((u) => u.claim === c.id) ? `<button class="btn" data-act="undo" data-id="${c.id}">Undo</button>` : ""}</div></div>`;
   const toP = r.routing.toPerson;
   return `<div class="card handback ${toP ? "" : "ready"}"><div class="row"><div class="eyebrow ${toP ? "ai" : ""}" style="flex:1;${toP ? "" : "color:var(--good)"}">${toP ? "Handing back to you" : "Ready for your OK"}</div><span class="pill ${toP ? "ai" : "good"}">${toP ? r.routing.reasons.length + " open question" + (r.routing.reasons.length > 1 ? "s" : "") : "No open questions"}</span></div>
   <dl class="hb"><dt>What the agents did</dt><dd>Read ${c.notes.length} SOAP note${c.notes.length > 1 ? "s" : ""} and the ${c.docType}, coded ${r.codes.filter((x) => x.status === "confirmed").length} diagnoses, mapped ${r.invoice.lines.length} lines, checked the requirements for ${h(r.insurer.name)} and built the packet.</dd>
   <dt>${toP ? "What we're unsure of" : "Checks"}</dt><dd>${toP ? `<ul style="margin:.1rem 0 0;padding-left:1rem">${r.routing.reasons.map((x) => `<li>${h(x)}</li>`).join("")}</ul>` : "Every code is confirmed, supported and agreed; every required document is present."}</dd>
   <dt>What we need</dt><dd>${toP ? "Your decision: approve the packet, change a code, or request records." : "Your OK to mark the packet ready to submit."}</dd>${c.approvalNote ? `<dt>Approval agent</dt><dd>${h(c.approvalNote)}</dd>` : ""}
   <dt>If no one decides</dt><dd>The claim waits in the queue. Nothing is submitted, paid or denied.</dd></dl>
-  <div class="row noprint" style="margin-top:.6rem"><button class="btn primary" data-act="approve">Approve packet</button><button class="btn" data-act="records">Request records</button><button class="btn" data-act="takeover">Take over</button></div>
+  <div class="row noprint" style="margin-top:.6rem"><button class="btn primary" data-act="approve">Approve packet</button><button class="btn" data-act="records">Request records</button><button class="btn" data-act="takeover">Take over</button>${reviewButton(c)}</div>
   <p class="small muted" style="margin:.4rem 0 0">Undo works until the packet is submitted. Every choice and code change is logged as a labeled example.</p></div>`;
+}
+
+function reviewButton(c) {
+  if (/Submitted/.test(c.status)) return "";
+  if (c.review && c.review.state === "open") return `<button class="btn ai" data-act="reviewdone" data-id="${c.id}">✓ Complete human review</button>`;
+  return `<button class="btn" data-act="humanreview" data-id="${c.id}">👤 Human review</button>`;
+}
+function growCard(c) {
+  const pg = progressOf(c);
+  return `<div class="card growcard" style="margin-bottom:.8rem"><div class="row"><div style="flex:1;min-width:14rem"><div class="eyebrow ai">Claim ${c.id} in the process · ${Math.floor(pg.done)} of 8 steps</div><h3 style="margin:.15rem 0 0">${h(pg.now)}</h3></div>${reviewButton(c)}</div>
+    <div class="d3wrap" id="chGrow" role="img" aria-label="Claim ${c.id}: ${h(pg.now)}, ${Math.floor(pg.done)} of 8 steps"></div>
+    <p class="small muted" style="margin:.2rem 0 0">Steps 1 to 6 are agents; step 7 is the Approval agent or a person; a person can send any claim to human review before it is submitted.</p></div>`;
 }
 
 // ---------- views ----------
@@ -491,11 +528,11 @@ function viewDesk() {
   const notesPanel = (c) => `<tr class="notesrow"><td colspan="9"><div class="notes"><div class="row"><span class="eyebrow ai" style="flex:1">SOAP notes on claim ${c.id} · each coded by the agents</span><a class="btn small" href="#new/add/${c.id}">+ Add SOAP note</a></div>
       ${c.notes.map((n, i) => { const conf = c.result.codes.filter((x) => x.status === "confirmed").map((x) => x.term.toLowerCase()); const sus = c.result.codes.filter((x) => x.status !== "confirmed").length;
         return `<div class="row" style="margin-top:.45rem;flex-wrap:nowrap;align-items:flex-start"><span class="dot" style="color:var(--${c.result.routing.toPerson ? "warn" : "good"});margin-top:.45em"></span><div style="flex:1"><b>SOAP note ${i + 1} · ${dshort(c.visit)} visit · ${h(clinicOf(c.clinic).name)}</b><div class="small muted">Coded ${tm(n.codedAt)}: ${h(conf.join(", ") || "no confirmed diagnosis")}${sus ? " · " + sus + " rule-out held back" : ""} · reviewer ${c.result.codes.every((x) => x.review.agree) ? "agrees" : "disagrees"}${c.result.history.flags.length ? " · pre-existing window flagged" : ""} · ${h(n.file)}</div></div><span class="mono muted">${tm(n.codedAt)}</span></div>`; }).join("")}</div></td></tr>`;
-  const claimTable = (claims, withPet) => `<div class="scroll"><table class="wide"><thead><tr><th>Claim</th>${withPet ? "<th>Animal</th>" : ""}<th>Visit</th><th>Clinic</th><th>Network</th><th>SOAP notes</th><th>Codes</th><th style="text-align:right">Amount</th><th>Status</th></tr></thead><tbody>
+  const claimTable = (claims, withPet) => `<div class="scroll"><table class="wide"><thead><tr><th>Claim</th>${withPet ? "<th>Animal</th>" : ""}<th>Visit</th><th>Clinic</th><th>Network</th><th>SOAP notes</th><th>Codes</th><th style="text-align:right">Amount</th><th>Status and progress</th></tr></thead><tbody>
     ${claims.map((c) => { const p = petOf(c.pet); const conf = c.result.codes.filter((x) => x.status === "confirmed"); const open = S.openNotes.has(c.id);
       return `<tr class="click" data-act="open" data-id="${c.id}" tabindex="0"><td class="mono">${c.id}</td>${withPet ? `<td>${h(p.name)}</td>` : ""}<td class="nw">${dshort(c.visit)}</td><td>${h(clinicOf(c.clinic).name)}</td><td>${networkPill(c)}</td>
       <td><button class="pill ai" style="border:0;cursor:pointer" data-act="notes" data-id="${c.id}" aria-expanded="${open}"><span class="dot"></span>${c.notes.length} of ${c.notes.length} coded ${open ? "▴" : "▾"}</button></td>
-      <td>${conf.map((x) => h(x.term)).join(", ") || '<span class="muted">Suspected only</span>'}</td><td class="mono nw" style="text-align:right">${money(c.result.invoice.total)}</td><td>${statusPill(c)}</td></tr>${open ? notesPanel(c) : ""}`; }).join("")}</tbody></table></div>`;
+      <td>${conf.map((x) => h(x.term)).join(", ") || '<span class="muted">Suspected only</span>'}</td><td class="mono nw" style="text-align:right">${money(c.result.invoice.total)}</td><td>${statusPill(c)}<div class="nw" style="margin-top:.3rem">${(() => { const pg = progressOf(c); return `<span class="mgrow" data-p="${(pg.done / 8).toFixed(3)}" data-tone="${pg.tone}" title="${h(pg.now)}: ${Math.round(pg.done * 10) / 10} of 8 steps" role="img" aria-label="${h(pg.now)}, ${Math.floor(pg.done)} of 8 steps"><i></i></span> <span class="small muted">${Math.floor(pg.done)}/8</span>`; })()}</div></td></tr>${open ? notesPanel(c) : ""}`; }).join("")}</tbody></table></div>`;
   const animalCard = (p) => { const cl = S.claims.filter((c) => c.pet === p.id).sort((a, b) => b.visit.localeCompare(a.visit)); const left = Math.max(0, p.deductible - p.deductibleMet);
     return `<div class="card"><div class="row" style="align-items:flex-start"><div style="flex:1"><div class="eyebrow">Animal</div><h2 style="margin-top:.15rem">${h(p.name)} · ${h(p.species)}, ${p.age}, ${h(p.breed)}</h2>
       <div class="small muted">Enrolled ${dshort(p.coverageStart)} · Plan B-2024 · illness wait ended ${dshort(A.addDays(p.coverageStart, 14))} · ${cl.length} claim${cl.length === 1 ? "" : "s"} · <span style="color:var(--${left ? "ai" : "good"})">Yearly deductible: ${money(left)} left of ${money(p.deductible)}</span> · Plan cap: unlimited</div></div>
@@ -578,6 +615,7 @@ function viewReview(id) {
   return `<div class="pagehead"><div class="t"><div class="eyebrow">Step 3 of 3 · Claim review · Claim ${c.id} · filed ${dt(c.filed)} · visit ${dshort(c.visit)}</div><h1>${h(p.name)}, ${p.age}-year-old ${h(p.breed)} · ${h((c.result.codes.find((x) => x.status === "confirmed") || c.result.codes[0] || { term: "no confirmed diagnosis" }).term.toLowerCase())}</h1>
     <div class="row small muted" style="margin-top:.2rem">${h(cl.name)}, ${h(cl.city)} · Attending veterinarian: as signed on the SOAP note · Owner: ${h(o.name)} · Policy ${h(o.policy)} ${networkPill(c)} ${statusPill(c)}</div></div>
     <div class="row"><label class="small muted" for="pick">Claim</label><select id="pick" data-act="pick" style="width:auto">${S.claims.map((x) => `<option value="${x.id}" ${x.id === c.id ? "selected" : ""}>${x.id} · ${h(petOf(x.pet).name)} · ${h(x.status)}</option>`).join("")}</select></div></div>
+  ${growCard(c)}
   ${stepper(c)}
   <div class="card" style="margin-top:.8rem"><div class="charthead"><div class="eyebrow ai">Agent run timeline · claim ${c.id}</div><span class="small muted">${(c.result.totalMs / 1000).toFixed(1)} s from upload to packet</span><button class="btn small" data-act="replay">▶ Replay the run</button></div>
     <div class="d3wrap" id="chGantt"></div>${CC_CHARTS.legend([["Agent step passed", CC_CHARTS.C.ai], ...(ganttRows(c).some((d) => d.warn) ? [["Flagged for a person", CC_CHARTS.C.warn]] : []), ...(c.decision && c.decision.by === "Approval agent" ? [["Approved by the Approval agent", CC_CHARTS.C.good]] : [])])}
@@ -698,11 +736,13 @@ function mountCharts(name, id) {
     CH.stream = CC_CHARTS.stream($("#chStream")); CH.stream.update(S.ops.recent); $("#chStreamLegend").innerHTML = CH.stream.legend; streamTable();
     CH.errors = CC_CHARTS.errors($("#chErrors")); CH.errors.update(errorRows()); $("#chErrorsLegend").innerHTML = CH.errors.legend;
   } else if (name === "review") {
+    CH.grow = CC_CHARTS.growth($("#chGrow"), progressOf(claimOf(S.claim)));
     CH.gantt = CC_CHARTS.gantt($("#chGantt"), ganttRows(claimOf(S.claim)));
   } else if (name === "resources") {
     CC_CHARTS.monthly($("#chMonthly"), window.CC_CLAIMS_DATASET.monthly); CC_CHARTS.amounts($("#chAmounts"), window.CC_CLAIMS_DATASET.amountBins);
   } else {
     const el = $("#chSystems"); if (el) CC_CHARTS.systems(el, systemRows(el.dataset.scope.split(",").map(claimOf).filter(Boolean)));
+    CC_CHARTS.miniGrowth($("#view"));
   }
 }
 let rsT; let lastW = window.innerWidth;
@@ -826,7 +866,7 @@ document.addEventListener("click", (e) => {
   else if (a === "open") { location.hash = "#review/" + t.dataset.id; }
   else if (a === "jump") { const m = document.getElementById("ev-" + t.dataset.code); if (m) { m.scrollIntoView({ behavior: S.reduce ? "auto" : "smooth", block: "center" }); m.classList.add("flash"); setTimeout(() => m.classList.remove("flash"), 1500); } }
   else if (a === "approve" || a === "records" || a === "takeover") decide(a);
-  else if (a === "undo") { const i = S.undo.map((u) => u.claim).lastIndexOf(t.dataset.id || S.claim); if (i < 0) return; const u = S.undo.splice(i, 1)[0]; const c = claimOf(u.claim); if (c.decision && c.decision.by === "Approval agent") S.corrections.push({ claim: c.id, at: new Date().toISOString(), text: "A person undid the Approval agent's approval (labeled example)" }); c.decision = u.decision; c.status = u.status; log("You", "Undo on claim " + c.id, "info"); say("Undone"); route(); }
+  else if (a === "undo") { const i = S.undo.map((u) => u.claim).lastIndexOf(t.dataset.id || S.claim); if (i < 0) return; const u = S.undo.splice(i, 1)[0]; const c = claimOf(u.claim); if (c.decision && c.decision.by === "Approval agent") S.corrections.push({ claim: c.id, at: new Date().toISOString(), text: "A person undid the Approval agent's approval (labeled example)" }); c.decision = u.decision; c.status = u.status; if ("review" in u) c.review = u.review ? Object.assign({}, u.review) : null; log("You", "Undo on claim " + c.id, "info"); say("Undone"); route(); }
   else if (a === "master") setMaster(!S.master);
   else if (a === "stopall") stopAll();
   else if (a === "pause") { const g = AG[t.dataset.a]; g.paused = !g.paused; log(g.name, g.paused ? "Paused by a person." : "Resumed by a person.", g.paused ? "warn" : "good"); renderAgentsTable(); renderLive(); }
@@ -838,6 +878,14 @@ document.addEventListener("click", (e) => {
   else if (a === "download") { const c = claimOf(S.claim); const blob = new Blob([JSON.stringify(c.result.packet, null, 2)], { type: "application/json" }); const u = URL.createObjectURL(blob); const l = document.createElement("a"); l.href = u; l.download = "claim-" + c.id + "-packet.json"; l.click(); setTimeout(() => URL.revokeObjectURL(u), 1000); }
   else if (a === "print") window.print();
   else if (a === "replay") { if (CH.gantt) CH.gantt.play(); }
+  else if (a === "humanreview") { const c = claimOf(t.dataset.id || S.claim); const at = new Date().toISOString(); const from = c.decision && c.decision.by === "Approval agent" ? "Approval agent's" : null;
+    S.undo.push({ claim: c.id, decision: c.decision, status: c.status, review: null }); c.review = { state: "open", at, by: "You", from }; c.decision = null; c.status = "In human review";
+    S.corrections.push({ claim: c.id, at, text: "Sent to human review" + (from ? " (Approval agent's approval set aside)" : "") + " (labeled example)" });
+    log("You", "Claim " + c.id + " sent to human review." + (from ? " The Approval agent's approval is set aside until the review is done." : ""), "warn"); say("Claim " + c.id + " sent to human review"); route(); }
+  else if (a === "reviewdone") { const c = claimOf(t.dataset.id || S.claim); const at = new Date().toISOString();
+    S.undo.push({ claim: c.id, decision: null, status: c.status, review: Object.assign({}, c.review) }); c.review.state = "done"; c.review.doneAt = at;
+    c.decision = { kind: "approve", label: "Approved after human review", at, by: "Human reviewer" }; c.status = "Approved";
+    S.corrections.push({ claim: c.id, at, text: "Human review completed, packet approved (labeled example)" }); log("Human reviewer", "Claim " + c.id + " reviewed and approved, ready to submit.", "good"); say("Human review complete"); route(); }
   else if (a === "font") { const cur = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--fs")) || 150; const n = Math.min(250, Math.max(100, cur + 25 * +t.dataset.d)); document.documentElement.style.setProperty("--fs", n + "%"); pref("fs", n); }
   else if (a === "theme") { const dk = document.documentElement.dataset.theme !== "dark"; document.documentElement.dataset.theme = dk ? "dark" : "light"; pref("theme", dk ? "dark" : "light"); themeLabel(); }
   else if (a === "motion") { S.reduce = !S.reduce; document.body.classList.toggle("reduce", S.reduce); t.textContent = S.reduce ? "Motion off" : "Motion on"; t.setAttribute("aria-pressed", String(!S.reduce)); pref("motion", S.reduce ? "off" : "on"); }

@@ -21,6 +21,7 @@ Every proposed code keeps its supporting text, document and page, coding-system 
 
 - Only the in-app Approval agent approves, and only clean claims: all six steps passed, every code confirmed, supported and agreed, every required document present, no pre-existing or waiting-period flag, total at or under the limit a person sets. It never acts on estimates. A person can undo any approval or turn it off.
 - No agent submits, pays or denies a claim. Everything with an open question goes to a person.
+- A person can send any claim to human review before it is submitted, which sets aside an Approval agent approval until the review is complete.
 - A checking agent's disagreement goes to a person; neither agent overrules the other.
 - The master shutoff can be turned off through the API; turning it back on needs a person.
 - Stop all (Esc) halts every working agent; security agents keep running.

@@ -291,6 +291,49 @@
     return {};
   };
 
+
+  // ---------- 8. Claim growth bar: how far one claim is through the process ----------
+  // p = { done: 0..8, tone: "ai"|"good"|"warn"|"accent", stages: [{ label, time }], now: label of where it is }
+  API.growth = function (el, p) {
+    if (!ok() || !el) return null;
+    const narrow = el.clientWidth < 620;
+    const f = frame(el, narrow ? 78 : 92, { l: 10, r: 14, t: narrow ? 14 : 30, b: 10 });
+    const { svg, iw, m } = f;
+    svg.selectAll("*").remove();
+    const g = svg.append("g").attr("transform", `translate(${m.l},${m.t})`);
+    const n = p.stages.length, x = d3.scaleLinear().domain([0, n]).range([0, iw]);
+    const bh = 14, cy = 8;
+    g.append("rect").attr("class", "gtrack").attr("x", 0).attr("y", cy - bh / 2).attr("width", iw).attr("height", bh).attr("rx", bh / 2);
+    const fill = g.append("rect").attr("class", "gfill").attr("x", 0).attr("y", cy - bh / 2).attr("height", bh).attr("rx", bh / 2).attr("width", 0).style("fill", C[p.tone] || C.ai);
+    const ticks = g.selectAll("g.gt").data(p.stages).join("g").attr("class", "gt").attr("transform", (d, i) => `translate(${x(i + 1) - (i === n - 1 ? 0 : 0)},0)`);
+    ticks.append("line").attr("y1", cy - bh / 2).attr("y2", cy + bh / 2).attr("class", (d, i) => i === n - 1 ? "gsep last" : "gsep");
+    const lx = (i) => x(i + 0.5);
+    g.selectAll("text.gl").data(p.stages).join("text").attr("class", (d, i) => "gl" + (i < Math.ceil(p.done) ? " on" : "")).attr("x", (d, i) => lx(i)).attr("y", narrow ? cy + 26 : -10).attr("text-anchor", "middle").text((d, i) => narrow ? i + 1 : d.label);
+    if (!narrow) g.selectAll("text.gtime").data(p.stages).join("text").attr("class", "gtime").attr("x", (d, i) => lx(i)).attr("y", cy + 28).attr("text-anchor", "middle").text((d) => d.time || "—");
+    const head = g.append("g").attr("class", "ghead" + (p.done < n ? " live" : "")).attr("transform", `translate(0,${cy})`);
+    head.append("circle").attr("class", "ring").attr("r", 9).style("stroke", C[p.tone] || C.ai);
+    head.append("circle").attr("r", 7).style("fill", C[p.tone] || C.ai);
+    const hit = g.selectAll("rect.hit").data(p.stages).join("rect").attr("class", "hit").attr("x", (d, i) => x(i)).attr("width", x(1)).attr("y", -26).attr("height", 60)
+      .on("mousemove", (ev, d) => { const i = p.stages.indexOf(d); showTip(ev, `<b>${i + 1} ${esc(d.label)}</b><br>${i < Math.floor(p.done) ? "Done" : i < p.done ? "In progress" : "Not yet"}${d.time ? " · " + esc(d.time) : ""}${d.who ? "<br>" + esc(d.who) : ""}`); }).on("mouseleave", hideTip);
+    function grow() {
+      const w = x(p.done), k = API.reduce() ? 0 : 1;
+      fill.interrupt().attr("width", k ? 0 : w).transition().duration(1400 * k).ease(d3.easeCubicOut).attr("width", Math.max(bh, w));
+      head.interrupt().attr("transform", `translate(${k ? 0 : w},${cy})`).transition().duration(1400 * k).ease(d3.easeCubicOut).attr("transform", `translate(${Math.max(7, w - (p.done >= n ? 7 : 0))},${cy})`);
+      g.selectAll("text.gl").classed("on", false).transition().delay((d, i) => 1400 * k * (i + 1) / Math.max(1, p.done)).duration(0).on("end", function (d, i) { d3.select(this).classed("on", i < Math.ceil(p.done)); });
+    }
+    grow();
+    return { grow };
+  };
+  // Small growth bars in a table: each <span class="mgrow" data-p="0..1" data-tone="..."> fills with motion.
+  API.miniGrowth = function (root) {
+    if (!ok() || !root) return;
+    d3.select(root).selectAll(".mgrow i").each(function () {
+      const el = this, p = +el.parentNode.dataset.p, tone = el.parentNode.dataset.tone;
+      d3.select(el).style("background", C[tone] || C.ai).style("width", API.reduce() ? p * 100 + "%" : "0%")
+        .transition().delay(dur(150)).duration(dur(1100)).ease(d3.easeCubicOut).style("width", p * 100 + "%");
+    });
+  };
+
   API.legend = legend; API.table = table;
   window.CC_CHARTS = API;
 })();
