@@ -47,7 +47,7 @@ For every proposed code the agents keep the supporting text, document and page, 
 
 ## Resources, in the order the agents use them
 
-1. The target insurer's claim requirements. Pumpkin asks for an itemized invoice and relevant medical records (Pumpkin, n.d.-a, n.d.-b).
+1. The target insurer's claim requirements. The client profile asks for an itemized invoice and relevant medical records.
 2. Small Animal Problem and Diagnosis Terms (SA-PDT), a SNOMED CT and VetSCT subset from VTS at Virginia Tech. The app uses a sample of term names; IDs are placeholders (SIM-) until the release is downloaded with a VTS or UMLS account and its terms of use are confirmed.
 3. The Veterinary Extension to SNOMED CT (VetSCT), when SA-PDT lacks a concept.
 4. VeNom, for procedures and presenting complaints; mappings to SNOMED need validation.
@@ -90,10 +90,6 @@ North American Pet Health Insurance Association. (2025, April 22). *North Americ
 O'Brien, J., McCullough, A., Debes, C., & Ruple, A. (2024). *Using pet insurance claims to predict occurrence of vector-borne and zoonotic disease in humans* [Preprint]. medRxiv. https://doi.org/10.1101/2024.08.09.24311752
 
 Hart, S. R. (n.d.). *predicting-claims* [Data set]. GitHub. Retrieved October 23, 2026, from https://github.com/stevenrhart/predicting-claims/tree/main/data
-
-Pumpkin. (n.d.-a). *Claims*. Retrieved October 22, 2026, from https://www.pumpkin.care/claims
-
-Pumpkin. (n.d.-b). *FAQs*. Retrieved October 22, 2026, from https://www.pumpkin.care/faqs
 
 Virginia-Maryland College of Veterinary Medicine, Veterinary Terminology Services. (2026). *Small Animal Problem and Diagnosis Terms*. https://vtsl.vetmed.vt.edu/sa
 

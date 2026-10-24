@@ -341,7 +341,7 @@ function code(claim, opts) {
     const ins = D.INSURERS[claim.insurer || "northpaw"]; const urgentCodes = ["Toxin ingestion", "Urethral obstruction", "Gastrointestinal foreign body", "Congestive heart failure", "Seizure", "Fracture", "Pneumonia", "Hemangiosarcoma", "Bite wound"];
     const conf = r.codes.filter((x) => x.status === "confirmed" && urgentCodes.includes(x.term)).map((x) => x.term);
     claim.emergency = { by: "Emergency agent", at: new Date(new Date(claim.filed).getTime() + triageMs).toISOString(), ms: triageMs, reasons: ewhy, confirmed: conf,
-      fastTrack: ins.id === "pumpkin" && r.invoice.total >= 500 ? "Eligible for the insurer's fast track for care of $500 or more (PumpkinNow)" : null };
+      fastTrack: ins.fastTrack && r.invoice.total >= ins.fastTrack.min ? "Eligible for the insurer's fast track for care of $500 or more" : null };
     if (r.routing.toPerson) r.routing.reasons.unshift("Emergency: reviewed first by the Emergency agent; this claim is at the front of your queue.");
     AG["Emergency agent"].tasks++; AG["Emergency agent"].ms.push(triageMs);
   } else claim.emergency = null;
@@ -777,7 +777,7 @@ function viewAgents() {
 
 function viewResources() {
   const R = [
-    ["Target insurer's claim requirements", "Sets the required documents, fields and any accepted codes. Pumpkin asks for an itemized invoice (copy or photo) and relevant medical records; PumpkinNow covers eligible care of $500 or more with a final invoice.", [["Pumpkin claims", "https://www.pumpkin.care/claims"], ["Pumpkin FAQs", "https://www.pumpkin.care/faqs"]], "Built in: Pumpkin and a fictional profile"],
+    ["Target insurer's claim requirements", "Sets the required documents, fields and any accepted codes. The client profile asks for an itemized invoice (copy or photo) and relevant medical records, with a fast track for eligible care of $500 or more filed with a final invoice.", [], "Built in: a national pet insurer client profile and a fictional profile"],
     ["Small Animal Problem and Diagnosis Terms (SA-PDT)", "Primary vocabulary for general, specialty and emergency small animal care. A SNOMED CT and VetSCT subset from VTS at Virginia Tech; release of Sept 30, 2026. Download needs a VTS or UMLS login; terms of use not stated on the page.", [["SA-PDT page", "https://vtsl.vetmed.vt.edu/sa"]], "Sample of term names in use; IDs are placeholders"],
     ["VetSCT / Veterinary Extension to SNOMED CT", "Fallback when SA-PDT lacks a concept. March 2026 production release, distributed through SNOMED International's MLDS (login required).", [["Release notice", "https://forums.snomed.org/t/march-2026-veterinary-extension-to-snomed-ct-package-production-release-available/1112"]], "Not loaded yet"],
     ["VeNom", "Procedures, presenting complaints and diagnoses; earlier if a partner uses it. Codes are shared on request by the VeNom Coding Group. Mappings to SNOMED need validation.", [["VeNom Coding Group", "https://en.wikipedia.org/wiki/VeNom_Coding_Group"]], "Cross-walk planned"],

@@ -74,14 +74,13 @@
       preexistingRule: "Pre-existing if signs appear in the 12 months before coverage starts or during the 14-day illness wait. A curable condition free of signs and treatment for 365 days may be covered again.",
       source: null,
     },
-    pumpkin: {
-      id: "pumpkin", name: "Pumpkin (published requirements)", fictional: false,
+    national: {
+      id: "national", name: "National pet insurer (client profile)", fictional: true,
       required: [["claimForm", "Claim form with visit details"], ["itemizedInvoice", "Itemized invoice (copy or photo)"]],
       recommended: [["soapNote", "Relevant medical records"]],
-      fastTrack: { min: 500, label: "PumpkinNow: eligible vet care of $500 or more can be filed with a final invoice before you pay" },
+      fastTrack: { min: 500, label: "Fast track: eligible vet care of $500 or more can be filed with a final invoice before you pay" },
       waitingDays: 14, lookbackMonths: null, curableFreeDays: 180, directPayNetwork: false,
       preexistingRule: "Not covered if a condition occurs or shows symptoms before coverage starts or during a waiting period. A curable condition may be covered if it recurs after the pet was free of symptoms and treatment for 180 days.",
-      source: [["Pumpkin claims page", "https://www.pumpkin.care/claims"], ["Pumpkin FAQs", "https://www.pumpkin.care/faqs"]],
     },
   };
 
